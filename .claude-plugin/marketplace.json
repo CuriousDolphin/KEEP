@@ -1,0 +1,25 @@
+{
+  "name": "keep-knowledge",
+  "description": "Marketplace catalog for the KEEP knowledge-engine Claude Code plugin.",
+  "owner": {
+    "name": "KEEP"
+  },
+  "plugins": [
+    {
+      "name": "keep",
+      "source": "./",
+      "description": "Maintain living engineering knowledge alongside code — Living Specs - Cognitive System",
+      "repository": "https://github.com/CuriousDolphin/KEEP",
+      "keywords": [
+        "knowledge",
+        "adr",
+        "runbook",
+        "specs",
+        "architecture",
+        "documentation",
+        "sdd",
+        "living specs"
+      ]
+    }
+  ]
+}
