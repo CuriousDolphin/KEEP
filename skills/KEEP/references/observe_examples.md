@@ -1,4 +1,4 @@
-# /observe — worked examples
+# /keep-observe — worked examples
 
 Use these to calibrate classification when a diff is ambiguous. The principle running through all of them: stick to what the diff actually shows, and resist the temptation to narrate.
 
@@ -6,7 +6,7 @@ Use these to calibrate classification when a diff is ambiguous. The principle ru
 
 **Diff (summary):** new file `auth/jwt_refresh.py` implements a token refresh flow. `auth/jwt.py` gets a new `refresh()` method. Tests added.
 
-**Good `/observe` output:**
+**Good `/keep-observe` output:**
 
 ```
 Detected changes:
@@ -43,7 +43,7 @@ The diff is a single behavioral addition. There is no topology change, no reject
 
 **Diff (summary):** removed direct FastAPI → Triton calls. Introduced Ray Serve as an intermediary. New `serve/` directory. The PR description explains they considered KServe and BentoML.
 
-**Good `/observe` output:**
+**Good `/keep-observe` output:**
 
 ```
 Detected changes:
@@ -65,7 +65,7 @@ This is exactly when an ADR earns its place: a non-trivial choice with stated al
 
 **Diff (summary):** renamed `utils.py` → `helpers.py`, split a 400-line file into three smaller modules. No behavior change. All tests pass unchanged.
 
-**Good `/observe` output:**
+**Good `/keep-observe` output:**
 
 ```
 Detected changes:
@@ -82,7 +82,7 @@ Refactors that preserve behavior do not require knowledge updates. Resist the ur
 
 **Diff (summary):** added retry logic with exponential backoff for JWKS fetches. Commit message references an incident where Auth0 rate-limited the service.
 
-**Good `/observe` output:**
+**Good `/keep-observe` output:**
 
 ```
 Detected changes:
@@ -104,7 +104,7 @@ Real production incidents are exactly what runbooks are for. Capture them once, 
 
 **Diff (summary):** a 50-file diff touching frontend, API, and inference layers. No clear narrative in the commit messages.
 
-**Good `/observe` output:**
+**Good `/keep-observe` output:**
 
 ```
 Detected changes:
@@ -119,9 +119,9 @@ When in doubt, ask. Speculative classification poisons the knowledge layer.
 
 ## Example 6 — observing a PR (not just a diff)
 
-**Source:** `/observe PR#142` — a feature branch with 12 commits ahead of `main`. The PR title is "Add JWT refresh + JWKS caching" and the description mentions Auth0 rate-limiting.
+**Source:** `/keep-observe PR#142` — a feature branch with 12 commits ahead of `main`. The PR title is "Add JWT refresh + JWKS caching" and the description mentions Auth0 rate-limiting.
 
-**Good `/observe` output:**
+**Good `/keep-observe` output:**
 
 ```
 Detected changes (from PR#142, 12 commits):
@@ -147,15 +147,15 @@ Notable commit messages:
 - "decided against pre-warming the cache because the rotation window is short"  ← ADR signal
 ```
 
-The PR mode gives `/observe` two things a bare diff doesn't: the **narrative arc** across commits, and **rationale fragments** in commit messages. Surface those quotes verbatim — they are the cheapest source of decision context the user has to verify.
+The PR mode gives `/keep-observe` two things a bare diff doesn't: the **narrative arc** across commits, and **rationale fragments** in commit messages. Surface those quotes verbatim — they are the cheapest source of decision context the user has to verify.
 
-The commit about "decided against pre-warming" is a strong signal for an ADR. `/compile` should pick it up.
+The commit about "decided against pre-warming" is a strong signal for an ADR. `/keep-compile` should pick it up.
 
 ## Example 7 — observing a folder of existing docs (brownfield ingestion)
 
-**Source:** `/observe ./old-docs/` — a folder of pre-existing markdown files (architecture diagrams, design notes, an `auth-design.md`, a `deployment-runbook.md`).
+**Source:** `/keep-observe ./old-docs/` — a folder of pre-existing markdown files (architecture diagrams, design notes, an `auth-design.md`, a `deployment-runbook.md`).
 
-**Good `/observe` output:**
+**Good `/keep-observe` output:**
 
 ```
 Detected ingestion candidates (from ./old-docs/, 8 files):
@@ -183,7 +183,7 @@ No action suggested for:
 - ./old-docs/old-todo-list.md  ← appears to be ephemeral task state, not durable knowledge
 ```
 
-Ingestion mode is **classification only** — `/observe` never migrates content. It surfaces the mapping so `/compile` can run the elicitation protocol per file and migrate with user approval. Unclear or ambiguous files get flagged for user decision rather than guessed at.
+Ingestion mode is **classification only** — `/keep-observe` never migrates content. It surfaces the mapping so `/keep-compile` can run the elicitation protocol per file and migrate with user approval. Unclear or ambiguous files get flagged for user decision rather than guessed at.
 
 ## General rules
 
@@ -191,4 +191,4 @@ Ingestion mode is **classification only** — `/observe` never migrates content.
 - If a category is empty, omit it. Do not write `Operational: None.`
 - **Quote** commit messages or doc fragments that contain rationale signals rather than paraphrasing them — they are evidence the user can verify.
 - When the source is large and heterogeneous, prefer asking the user to narrow the scope over producing a sprawling classification.
-- For ingestion of existing doc folders: never auto-migrate. Always classify and let `/compile` handle the migration with elicitation.
+- For ingestion of existing doc folders: never auto-migrate. Always classify and let `/keep-compile` handle the migration with elicitation.

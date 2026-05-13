@@ -10,7 +10,7 @@ Most knowledge in a monorepo is inherently cross-cutting:
 - The deployment pipeline touches all packages. Its runbook is one runbook.
 - A decision like "we use Postgres for everything" applies wherever data is stored.
 
-Per-package knowledge zones force artificial duplication of all of the above, and require the agent to scan multiple zones for context — exactly what KEEP is trying to avoid. A single root-level zone with package-aware subdirectories keeps `/retrieve` simple and lets cross-package relationships emerge naturally through the **Related** links.
+Per-package knowledge zones force artificial duplication of all of the above, and require the agent to scan multiple zones for context — exactly what KEEP is trying to avoid. A single root-level zone with package-aware subdirectories keeps `/keep-retrieve` simple and lets cross-package relationships emerge naturally through the **Related** links.
 
 ## Full layout
 
@@ -51,7 +51,7 @@ Per-package knowledge zones force artificial duplication of all of the above, an
 
 ## Command behaviors in a monorepo
 
-### `/retrieve <topic>`
+### `/keep-retrieve <topic>`
 
 Searches the single zone. When the topic matches a package name, results from that package's subdirectories come first; cross-cutting results from `shared/`, flat ADRs, and `architecture/overview.md` come after, clearly labeled:
 
@@ -69,7 +69,7 @@ Cross-cutting:
 
 When the topic does not match a package name, search proceeds normally across all subdirectories and the user gets results grouped by category (specs / decisions / architecture / runbooks) without per-package grouping.
 
-### `/observe`
+### `/keep-observe`
 
 When classifying a diff, infer which package(s) are affected from the file paths in the diff:
 
@@ -95,7 +95,7 @@ Suggested knowledge updates:
 - knowledge/docs/architecture/overview.md  (update: response flow)
 ```
 
-### `/compile`
+### `/keep-compile`
 
 Writes spec and runbook updates under the affected package's subdirectory; writes ADRs and architecture updates flat. When a change spans multiple packages:
 
@@ -103,7 +103,7 @@ Writes spec and runbook updates under the affected package's subdirectory; write
 - **Mention the affected packages** in the file's **Related** section: *"Applies to: auth-service, inference-api"* (this is a custom Related label, but works fine as long as it's consistent).
 - **ADRs that affect multiple packages** are flat. Their title and content make scope clear.
 
-### `/govern`
+### `/keep-govern`
 
 Runs across the whole zone but groups results by package subdirectory in the output:
 
@@ -133,7 +133,7 @@ shared / flat:
 | A failure mode in one package | `runbooks/<package>/<failure-mode>.md` |
 | A failure mode that crosses packages (e.g. shared DB exhaustion) | `runbooks/shared/<failure-mode>.md` |
 
-When the right location is genuinely unclear, `/compile` asks rather than guessing:
+When the right location is genuinely unclear, `/keep-compile` asks rather than guessing:
 
 > *"This spec describes how the API responds to malformed JSON, which applies to both auth-service and inference-api. Put it in `specs/shared/` (treat as cross-cutting) or in `specs/auth-service/` since that's where the change originated?"*
 

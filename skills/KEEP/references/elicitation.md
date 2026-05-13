@@ -1,6 +1,6 @@
 # Eliciting tacit knowledge — taxonomy and examples
 
-This file is consulted by `/compile` (and, more rarely, by `/observe` when the diff is ambiguous) before asking the user questions to capture knowledge that the diff alone cannot establish.
+This file is consulted by `/keep-compile` (and, more rarely, by `/keep-observe` when the diff is ambiguous) before asking the user questions to capture knowledge that the diff alone cannot establish.
 
 The protocol is in `SKILL.md` under **Eliciting tacit knowledge**. This file is the operational detail: *which* questions are worth asking for each file type, what good vs bad questions look like, and how to stay below the noise floor.
 
@@ -166,7 +166,7 @@ This is a single turn. The user answers all three; the file is written in the ne
 
 Use reactive mode for **runbooks** and for **incremental updates** to existing specs/ADRs/architecture files. Runbook fields are mostly independent of each other (symptoms, causes, mitigation can each be answered in isolation). Incremental updates touch one specific thing — asking about unrelated parts of the file is noise.
 
-Reactive protocol: ask only the question needed for the specific update at hand, write the update, move on. Multiple updates to the same file in one `/compile` should still batch their questions if the questions are correlated, but the file itself is updated incrementally.
+Reactive protocol: ask only the question needed for the specific update at hand, write the update, move on. Multiple updates to the same file in one `/keep-compile` should still batch their questions if the questions are correlated, but the file itself is updated incrementally.
 
 ## When the user declines or answers partially
 
@@ -180,7 +180,7 @@ Do **not** fabricate. Write the file with the uncertain fields **omitted**, and 
 <!-- TODO(KEEP): rejected alternatives not captured at compile time -->
 ```
 
-`/govern` will surface files with these markers in its next periodic run, giving the user a natural prompt to enrich them later when the context is fresher.
+`/keep-govern` will surface files with these markers in its next periodic run, giving the user a natural prompt to enrich them later when the context is fresher.
 
 ### Partial answers in batch mode
 
@@ -194,7 +194,7 @@ When you asked three questions in batch and the user answered, say, only two —
 
 - If the unanswered field is **enrichment** (e.g. "what should we revisit later", "any related work"): simply omit it from the file. No marker. Its absence is not a problem and creating a TODO for it just adds noise.
 
-**Do not re-ask in a follow-up turn.** The user already saw the questions and chose to answer some and skip others. Pushing for the missing answers is the interrogation pattern this protocol is designed to prevent. The TODO marker preserves the possibility of enrichment later, when `/govern` surfaces incomplete files in a natural moment.
+**Do not re-ask in a follow-up turn.** The user already saw the questions and chose to answer some and skip others. Pushing for the missing answers is the interrogation pattern this protocol is designed to prevent. The TODO marker preserves the possibility of enrichment later, when `/keep-govern` surfaces incomplete files in a natural moment.
 
 Write the file once with what you have. Move on.
 

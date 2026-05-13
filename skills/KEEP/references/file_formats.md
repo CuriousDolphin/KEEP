@@ -4,7 +4,7 @@ Templates for every file type in `/knowledge`, plus two cross-cutting convention
 
 ## Cross-cutting convention 1 — Linking between files
 
-Knowledge files reference each other constantly. A spec implements a decision. An ADR affects an architecture component. A runbook documents a failure mode of a particular spec. Without explicit links, these relationships exist only in the reader's head, and `/govern` cannot detect contradictions.
+Knowledge files reference each other constantly. A spec implements a decision. An ADR affects an architecture component. A runbook documents a failure mode of a particular spec. Without explicit links, these relationships exist only in the reader's head, and `/keep-govern` cannot detect contradictions.
 
 ### The convention
 
@@ -33,7 +33,7 @@ Reusable labels that work well:
 | Runbook | ADR | `Consequence of:` |
 | Architecture | ADR | `Documented by:` |
 
-When `/compile` updates a file, it should add or update the `## Related` section based on the changes — and update the *other side* of the link too. If spec A now implements ADR B, both files should reference each other.
+When `/keep-compile` updates a file, it should add or update the `## Related` section based on the changes — and update the *other side* of the link too. If spec A now implements ADR B, both files should reference each other.
 
 ---
 
@@ -85,7 +85,7 @@ When the user describes the status of an ADR in natural language, map their word
 | "deprecated" / "we're moving away from this" | `Status: Deprecated` (with a sentence explaining the migration direction) |
 | "we never really followed this" / "this was aspirational" | `Status: Deprecated` (and note this honestly in the body) |
 
-If the user names the successor decision, capture it. If they don't, do not fabricate one — write the appropriate Status, add a `<!-- TODO(KEEP): successor decision not identified at compile time -->` marker, and let `/govern` surface it later. **Never** invent a custom Status value like *"partially superseded but mostly current"* — those are signals that the standard patterns apply, you just need to apply them.
+If the user names the successor decision, capture it. If they don't, do not fabricate one — write the appropriate Status, add a `<!-- TODO(KEEP): successor decision not identified at compile time -->` marker, and let `/keep-govern` surface it later. **Never** invent a custom Status value like *"partially superseded but mostly current"* — those are signals that the standard patterns apply, you just need to apply them.
 
 ---
 
@@ -239,9 +239,9 @@ Operational knowledge derived from real production experience. Not theoretical.
 
 Only create a runbook for a failure that has actually happened or is genuinely likely. Speculative runbooks become noise.
 
-## INDEX.md — incrementally maintained by `/compile`
+## INDEX.md — incrementally maintained by `/keep-compile`
 
-`INDEX.md` is a flat semantic map of the knowledge base. It is the entry point for `/retrieve`.
+`INDEX.md` is a flat semantic map of the knowledge base. It is the entry point for `/keep-retrieve`.
 
 ```md
 # INDEX
@@ -273,19 +273,19 @@ Only create a runbook for a failure that has actually happened or is genuinely l
 
 ### How to update `INDEX.md` incrementally
 
-`/compile` does **not** regenerate the entire `INDEX.md` on every run. It does the following:
+`/keep-compile` does **not** regenerate the entire `INDEX.md` on every run. It does the following:
 
-1. **Identify affected sections.** Which domain(s) does this `/compile` touch? Which new entities, if any, are introduced? Did any flow change?
+1. **Identify affected sections.** Which domain(s) does this `/keep-compile` touch? Which new entities, if any, are introduced? Did any flow change?
 2. **Modify only those sections.** Insert new file paths in the right domain. Add new entities to the entity list, deduplicating against existing ones. Add a flow only if it crosses component boundaries described in architecture files.
 3. **Handle supersessions.** When an ADR is superseded, move its entry from the active domain list into the `## Superseded decisions` section at the bottom.
-4. **Preserve everything else byte-for-byte.** Sections not affected by this `/compile` should not appear in the diff.
+4. **Preserve everything else byte-for-byte.** Sections not affected by this `/keep-compile` should not appear in the diff.
 
 ### When to fully (re)generate `INDEX.md` instead
 
 Full regeneration is the right move only in these specific situations:
 
 - **First populate.** `INDEX.md` is missing entirely, is an empty file, or contains only a stub (less than ~5 non-empty lines — basically just a `# INDEX` heading and nothing else). In this case there is nothing meaningful to preserve, and regeneration produces a clean baseline.
-- **Explicit user request.** The user invokes `/compile --rebuild-index` or asks in plain language to rebuild the index from scratch.
+- **Explicit user request.** The user invokes `/keep-compile --rebuild-index` or asks in plain language to rebuild the index from scratch.
 - **Detected corruption.** The existing `INDEX.md` references files that no longer exist, or its structure has drifted so far from the current `/knowledge/docs` tree that incremental updates would patch over broken state. In this case, surface the problem to the user and ask before regenerating — do not silently rebuild.
 
 For every other run, incremental is the default. A full regeneration on a healthy index is destructive: it loses any manual edits the user made, reshuffles the order of entries (creating noise in git diffs), and may drop entities or flows whose source is not currently being touched.
@@ -304,11 +304,11 @@ Do not invent entities or flows that are not actually mentioned in the knowledge
 
 A domain with only one file is fine — it just means knowledge in that area is still nascent. List it normally; do not invent siblings to make it look fuller, and do not hide it. As more files accumulate the domain section will fill in naturally.
 
-The one case worth flagging is when many domains end up with only one entry each. That suggests the domains are too fine-grained; consider collapsing related single-entry domains into one broader heading on the next `/compile` (with user approval). `/govern` should surface this pattern when it detects more than ~5 single-entry domains in the same INDEX.
+The one case worth flagging is when many domains end up with only one entry each. That suggests the domains are too fine-grained; consider collapsing related single-entry domains into one broader heading on the next `/keep-compile` (with user approval). `/keep-govern` should surface this pattern when it detects more than ~5 single-entry domains in the same INDEX.
 
 ## Tasks — `/knowledge/tasks/<task-name>.md`
 
-Ephemeral execution state. Free-form body with a minimal YAML frontmatter that `/compile` manages automatically.
+Ephemeral execution state. Free-form body with a minimal YAML frontmatter that `/keep-compile` manages automatically.
 
 ```md
 ---
@@ -324,11 +324,11 @@ topic: auth-refresh   # short slug matching a domain or feature
 
 Field semantics:
 
-- **`status`** — `active` (work in progress), `done` (work concluded, durable knowledge updated), `abandoned` (work dropped). Maintained by `/compile`.
+- **`status`** — `active` (work in progress), `done` (work concluded, durable knowledge updated), `abandoned` (work dropped). Maintained by `/keep-compile`.
 - **`created`** — ISO date the task was created. Set once, never modified.
-- **`topic`** — short slug, ideally matching a domain in `INDEX.md` or a feature name. Used by `/compile` to correlate tasks with knowledge files.
+- **`topic`** — short slug, ideally matching a domain in `INDEX.md` or a feature name. Used by `/keep-compile` to correlate tasks with knowledge files.
 
-The user does not maintain this frontmatter by hand — `/compile` and `/govern` are the canonical writers. If a task file is created without frontmatter, `/compile` inserts a default block on first touch.
+The user does not maintain this frontmatter by hand — `/keep-compile` and `/keep-govern` are the canonical writers. If a task file is created without frontmatter, `/keep-compile` inserts a default block on first touch.
 
 **Archival convention:** when a task transitions to `done` or `abandoned`, it is moved to `/knowledge/tasks/_archive/<YYYY-MM-DD>-<original-name>.md` where the date comes from the `created` field. `active` tasks are never archived. See the task lifecycle section in `SKILL.md`.
 

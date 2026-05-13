@@ -1,6 +1,6 @@
 # Task lifecycle — details and operational rules
 
-The summary is in `SKILL.md`. This file covers the operational specifics: how `/compile` decides what to promote, how to handle tasks that span multiple `/compile` runs, the exact frontmatter rules, and the edge cases.
+The summary is in `SKILL.md`. This file covers the operational specifics: how `/keep-compile` decides what to promote, how to handle tasks that span multiple `/keep-compile` runs, the exact frontmatter rules, and the edge cases.
 
 ## Frontmatter — full specification
 
@@ -22,13 +22,13 @@ topic: auth-refresh
 
 | Field | Values | Set by | Mutable |
 |---|---|---|---|
-| `status` | `active`, `done`, `abandoned` | `/compile` | yes — transitions only |
+| `status` | `active`, `done`, `abandoned` | `/keep-compile` | yes — transitions only |
 | `created` | ISO date (YYYY-MM-DD) | task creation | never |
-| `topic` | short slug (lowercase, hyphens) | task creation or `/compile` | rarely, only on user request |
+| `topic` | short slug (lowercase, hyphens) | task creation or `/keep-compile` | rarely, only on user request |
 
 ### Status transitions
 
-The only allowed transitions, set by `/compile`:
+The only allowed transitions, set by `/keep-compile`:
 
 ```
 active → done           (work concluded successfully, durable knowledge updated)
@@ -41,7 +41,7 @@ Direct `done ↔ abandoned` transitions are not allowed — they would lose info
 
 ### Default frontmatter for files missing it
 
-If a task file is found in `/knowledge/tasks/` without frontmatter, `/compile` inserts a default block on first touch:
+If a task file is found in `/knowledge/tasks/` without frontmatter, `/keep-compile` inserts a default block on first touch:
 
 ```yaml
 ---
@@ -51,7 +51,7 @@ topic: <inferred>        # from filename or content; ask if unclear
 ---
 ```
 
-The `created` date in this case is the date `/compile` ran, not the actual creation date — there's no reliable way to recover the latter. Document this in a comment if helpful: `# created: 2026-05-12  # filled in by /compile on first touch`.
+The `created` date in this case is the date `/keep-compile` ran, not the actual creation date — there's no reliable way to recover the latter. Document this in a comment if helpful: `# created: 2026-05-12  # filled in by /keep-compile on first touch`.
 
 ## Task creation
 
@@ -65,9 +65,9 @@ Tasks are created freely during work. No template is enforced for the body — w
 
 The convention is encouraged but not enforced. The `topic` field in frontmatter is the canonical source of truth for task-knowledge correlation.
 
-## Promotion — how `/compile` decides what to promote
+## Promotion — how `/keep-compile` decides what to promote
 
-When `/compile` runs, it identifies task files whose `topic` matches the current change (or that the user explicitly references). For each matched task, scan the body for content that looks like durable knowledge.
+When `/keep-compile` runs, it identifies task files whose `topic` matches the current change (or that the user explicitly references). For each matched task, scan the body for content that looks like durable knowledge.
 
 ### Signals that indicate promotable content
 
@@ -105,14 +105,14 @@ When the user approves promotion:
    <!-- Promoted from /knowledge/tasks/auth-refresh-implementation.md on 2026-05-12 -->
    ```
 
-## Tasks that span multiple `/compile` runs
+## Tasks that span multiple `/keep-compile` runs
 
-A single piece of work often takes multiple commits and multiple `/compile` runs. The task stays `active` across all of them; `/compile` updates the durable knowledge incrementally each time, and only marks the task `done` when the user signals (explicitly or by closing the work) that the task is complete.
+A single piece of work often takes multiple commits and multiple `/keep-compile` runs. The task stays `active` across all of them; `/keep-compile` updates the durable knowledge incrementally each time, and only marks the task `done` when the user signals (explicitly or by closing the work) that the task is complete.
 
 When work is genuinely complete:
 
 - The user can say "this task is done" or similar.
-- Or `/compile` can ask: *"Is this task complete? It's been associated with this work for a while and the latest knowledge updates look comprehensive."*
+- Or `/keep-compile` can ask: *"Is this task complete? It's been associated with this work for a while and the latest knowledge updates look comprehensive."*
 - On confirmation, `status: done` and archival happen.
 
 If the user is unsure, leave the task `active`. Premature `done` marks cause confusion later when work continues.
@@ -126,9 +126,9 @@ If work resumes on something already archived (because it was prematurely closed
 
 The first option is usually cleaner — the archived task remains a record of what was, the new task captures what now is.
 
-## What `/govern` checks for tasks
+## What `/keep-govern` checks for tasks
 
-When `/govern` runs, it reports task issues separately from durable-knowledge issues:
+When `/keep-govern` runs, it reports task issues separately from durable-knowledge issues:
 
 ```
 Tasks needing attention:
@@ -143,15 +143,15 @@ Topic doesn't match any domain in INDEX:
 - knowledge/tasks/new-thing.md  (topic: gizmo, but no "gizmo" domain exists)
 ```
 
-For each issue, `/govern` only suggests action — never modifies. The user decides whether to update statuses, dig out content for promotion, or clean up.
+For each issue, `/keep-govern` only suggests action — never modifies. The user decides whether to update statuses, dig out content for promotion, or clean up.
 
 ## Hard rules (full list)
 
 - **Never auto-promote.** Always surface candidates and wait for explicit approval.
 - **Never let task content become the sole record of a durable fact.** If something is true and important, it lives in `/knowledge/docs`. The task may also contain it (e.g. as work-in-progress notes), but the durable layer is the source of truth.
 - **Tasks are never indexed in `INDEX.md`.** The index reflects durable knowledge only.
-- **The frontmatter is managed by `/compile` and `/govern`.** The user can edit it manually but should not need to — and if they do, the canonical values are what KEEP writes next.
+- **The frontmatter is managed by `/keep-compile` and `/keep-govern`.** The user can edit it manually but should not need to — and if they do, the canonical values are what KEEP writes next.
 - **Status transitions follow the allowed graph.** No direct `done ↔ abandoned`.
-- **Archived tasks are never deleted by KEEP automatically.** `/govern` can suggest cleanup, but the user approves.
+- **Archived tasks are never deleted by KEEP automatically.** `/keep-govern` can suggest cleanup, but the user approves.
 - **Promotion copies, it doesn't move.** Source task content is preserved.
-- **Tasks span multiple `/compile` runs naturally.** `status: active` is the default and stays that way until the user signals completion.
+- **Tasks span multiple `/keep-compile` runs naturally.** `status: active` is the default and stays that way until the user signals completion.
