@@ -40,7 +40,6 @@ Per-package knowledge zones force artificial duplication of all of the above, an
 │   │       │   └── gpu-oom.md
 │   │       └── shared/
 │   │           └── postgres-connection-pool.md
-│   ├── tasks/
 │   └── INDEX.md
 ├── packages/
 │   ├── auth-service/

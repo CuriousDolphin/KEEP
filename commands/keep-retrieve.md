@@ -1,18 +1,21 @@
 ---
-description: Load focused KEEP context for a topic (read-only)
+description: List knowledge files relevant to a topic (low-level — for synthesis prefer /keep-ask)
 argument-hint: <topic>
 ---
 
 Use the `keep` skill in **retrieve mode**. Topic: `$ARGUMENTS`.
 
+> **For most questions, prefer `/keep-ask <question>`.** It synthesizes an answer with citations. Use `/keep-retrieve` only when you need the *paths* to open files yourself — for example, when about to implement and you want the spec open in your editor.
+
 Follow this contract (full detail in the skill's `/keep-retrieve` section):
 
-- Read `INDEX.md` first as the primary map. Fall back to filename and content search across `/knowledge/docs/` only if INDEX is empty or doesn't cover the topic.
-- Surface only files that touch the topic. Group output by category — Architecture / Decisions / Specs / Runbooks — and list paths, not contents. The user opens what they need.
-- Prefer precision over completeness. Token budget is a real cost; irrelevant context degrades reasoning.
+- Read `INDEX.md` first. Filter by `domain`, `tags`, and `description` substring match.
+- Return a short list grouped by `type` and tag (Specs / ADRs / Runbooks / Architecture). Each item: id, title, path. No content — just identification.
+- Cap at ~10 entries. If the topic is too broad to filter, ask the user to narrow.
 
 **Hard rules**
 
 - Read-only. No file writes.
-- No speculation from the code about what *might* be relevant. Stick to what is indexed.
-- If `INDEX.md` is empty or missing, say so and suggest `/keep-init` (first-time setup) or `/keep-observe` + `/keep-compile` (to start populating it).
+- No speculation. Stick to what is indexed in `INDEX.md`.
+- If `INDEX.md` is missing or empty, say so and suggest `/keep-init` (first time) or `/keep-observe` + `/keep-compile` (to populate).
+- This command is *low-level*. For "how does X work?" questions, the right command is `/keep-ask`, not `/keep-retrieve`.

@@ -53,7 +53,9 @@ This produces structured, cross-linked knowledge files instead of a dump of lega
 ## KEEP workflow
 
 This repository uses KEEP (Knowledge Engine for Engineering Persistence).
-Durable knowledge lives in `/knowledge/docs`. Ephemeral task notes live in `/knowledge/tasks`.
+Durable knowledge lives in `/knowledge/`: specs and ADRs under `docs/`, half-formed
+proposals under `ideas/`. Execution state (active work-in-progress) is NOT stored here
+— use your ticket tracker or agent task list for that.
 
 Workflow:
 - First-time setup: `/keep-init` scaffolds `/knowledge` and proposes how to migrate
@@ -68,10 +70,6 @@ Workflow:
 For ADRs and new specs, `/keep-compile` runs an elicitation interview (in batch) before
 writing — expect a small number of targeted questions about rejected alternatives, edge
 cases, or root causes when the diff alone doesn't establish them.
-
-Task files (in `/knowledge/tasks/`) carry a minimal YAML frontmatter (`status`, `created`,
-`topic`) which is managed automatically by `/keep-compile`. You don't need to maintain it
-by hand.
 
 The knowledge layer is not optional — code changes that affect behavior, architecture,
 or operations should be reflected in `/knowledge` before the work is considered complete.
@@ -102,7 +100,7 @@ If `/keep-compile` produces a sensible diff on real work and asks the right kind
 
 - **Backfilling.** Trying to document the existing codebase before using KEEP. Don't. Document as code changes — or use `/keep-init` and brownfield ingestion if you genuinely have existing docs to migrate.
 - **Skipping `/keep-observe`.** Going straight to `/keep-compile` produces lower-quality updates because there is no classification step to anchor the changes.
-- **Letting tasks leak into docs.** Tasks are ephemeral. If something belongs in durable memory, it goes through `/keep-compile`'s promotion mechanism into `/knowledge/docs`, not by copying task content directly.
+- **Treating KEEP as a task tracker.** KEEP only stores durable knowledge (specs, ADRs, ideas). Active work-in-progress belongs in your ticket tracker or agent task list. If a working note turns out to contain durable signal (a decision, a runbook step, a confirmed edge case), capture it via `/keep-observe` → `/keep-compile`, not by dumping the note into `/knowledge`.
 - **Running `/keep-govern` every cycle.** It is meant to be periodic — weekly at most. Running it constantly creates noise.
 - **Multiple `/knowledge` directories in a monorepo.** KEEP uses one zone at the root, not one per package. Splitting them creates artificial duplication.
 - **Migrating pre-existing docs by hand.** Bypasses classification and elicitation. Use `/keep-init` (first time) or `/keep-observe ./folder/` (later) to produce the ingestion proposal, then `/keep-compile` to migrate with provenance.
@@ -112,12 +110,10 @@ If `/keep-compile` produces a sensible diff on real work and asks the right kind
 ```
 /knowledge
 ├── docs/
-│   ├── specs/             (per-package subdirs in monorepo)
-│   ├── decisions/         (flat — sequential ADRs)
-│   ├── architecture/      (flat — one file per area)
-│   └── runbooks/          (per-package subdirs in monorepo)
-├── tasks/                 (with auto-managed frontmatter)
-└── INDEX.md
+│   ├── specs/             (per-domain subdirs; runbook/architecture are tags, not folders)
+│   └── decisions/         (flat — sequential ADRs)
+├── ideas/                 (inbox for half-formed proposals)
+└── INDEX.md               (auto-generated from frontmatter)
 ```
 
 That is the entire surface area. Nothing else needs to be added for KEEP to work.

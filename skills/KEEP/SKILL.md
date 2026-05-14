@@ -1,70 +1,89 @@
 ---
 name: keep
-description: "Living engineering knowledge for a code repo — specs, ADRs, architecture, runbooks — kept coherent as code evolves. Use on the /keep-init, /keep-retrieve, /keep-observe, /keep-compile, /keep-govern commands, on plain-language equivalents ('what did we decide about X', 'document this change', 'load context for Y', 'should we write an ADR'), and proactively after non-trivial changes in any repo that has a /knowledge directory."
+description: "Living knowledge graph for a code repo — specs, ADRs, runbooks, architecture, and ideas — kept coherent as code evolves. CONSULT THIS SKILL on ANY question about how the system works, why it was built this way, what was decided, what the conventions are, where something lives, or whether a change is safe — even when the user does not name KEEP. Trigger on: 'how does X work', 'why did we', 'what did we decide', 'is there a convention for', 'where do I look', 'should we', 'what happens when'. Also trigger on: non-trivial code changes in a /knowledge-enabled repo, ingestion of pre-existing docs, capture of half-formed ideas, drift detection on PRs."
 ---
 
 # KEEP — Knowledge Engine for Engineering Persistence
 
-A lightweight, memory-centric layer that maintains *living engineering knowledge* alongside a code repository. KEEP exists because code changes constantly while knowledge usually does not — and the gap between the two is where systems become incomprehensible.
+KEEP turns a code repository into a **living knowledge graph** that an LLM agent can both consult and maintain. It is the answer to the question Karpathy posed for personal wikis applied to software: *what if every project had a wiki the LLM kept up to date for us, that we could query reliably?*
 
 KEEP treats the repository as a cognitive system:
 
 - **code** = execution layer
 - **`/knowledge`** = memory layer
-- **the agent (you)** = reasoning layer
+- **agent (you)** = reasoning layer
 
-The skill is successful when a new agent or engineer can understand *how and why* the system evolved without re-inferring architecture from code alone.
-
----
-
-## When to engage
-
-**Engage immediately** in any of these situations — do not wait for explicit confirmation:
-
-1. The user invokes one of the commands (`/keep-init`, `/keep-retrieve`, `/keep-observe`, `/keep-compile`, `/keep-govern`) or names KEEP or RepoMemory.
-2. The user asks something equivalent in plain language. Examples that should trigger this skill even though they never say "KEEP":
-   - *"What did we decide about the auth flow?"*
-   - *"Load the context for the inference pipeline"*
-   - *"Should I document this change somewhere?"*
-   - *"Where do notes about this go?"*
-   - *"Track this decision"* / *"Capture the reasoning"*
-   - *"What's the current architecture of X"* in a repo that has knowledge files
-3. **Proactive trigger** — the repository contains a `/knowledge` directory AND the user is making or has just made a non-trivial change. Categories that almost always warrant engagement:
-   - Adding a new feature or significantly extending an existing one
-   - Swapping a dependency, framework, or runtime
-   - Changing system topology (new service, new boundary, new flow)
-   - Fixing a bug following an incident (runbook candidate)
-   - Modifying configuration that changes runtime behavior
-
-   When you spot one of these in a `/knowledge`-enabled repo, do not silently complete the code work. Offer to run `/keep-observe` and propose updates. This is the entire reason the skill exists.
-
-4. **First-time adoption** — the repository has no `/knowledge` directory but obviously has documentation lying around (a `docs/` folder, `ARCHITECTURE.md`, `RUNBOOK.md`, an `adr/` directory, scattered design notes) AND the user is asking about decisions, intent, or where things should go. Offer `/keep-init` rather than answering ad hoc.
-
-**Do not engage** for:
-
-- Trivial edits (typos, formatting, single-line fixes with no semantic impact).
-- Repositories without a `/knowledge` folder, unless the user is asking to set one up or condition 4 above applies.
-- Bulk retroactive documentation of the existing codebase — KEEP is brownfield-first and grows incrementally.
-
-When in doubt, lean toward engaging and asking a quick check question rather than skipping. Under-triggering is the more common failure mode.
+The skill is successful when a new agent or engineer can answer *how* and *why* the system evolved without re-deriving everything from code, and when changes to code automatically surface as proposed changes to knowledge.
 
 ---
 
-## Core principles (apply to every action)
+## How to trigger this skill (read this section closely)
 
-1. **Memory-centric, not documentation-centric.** Capture rationale, architecture, constraints, and operational learnings. Skip implementation walkthroughs and prose that just re-narrates the code.
+KEEP is failing if it triggers only on code changes. Code is half the loop. The **read path** — consulting knowledge when answering questions — is the half that compounds value.
 
-2. **Brownfield-first.** Work incrementally on existing repos. Never require a full upfront documentation pass. Document only the areas touched by the current change — or migrate from existing docs via `/keep-init` + `/keep-compile`.
+### Strong read triggers — ALWAYS run `/keep-ask` first
 
-3. **Conservative knowledge compilation.** Never invent architecture or intent. Stick to what the diff and the existing docs actually support. Good: *"Added JWT refresh flow."* Bad: *"The system now follows zero-trust distributed authentication."*
+If the user's prompt contains any of these patterns, `/keep-ask` is the correct first action before answering:
 
-4. **Minimal diffs.** When updating existing knowledge files, change as little as possible. Preserve human-written rationale verbatim. Do not rewrite whole files.
+- *"how does X work?"*
+- *"why did we choose Y?"* / *"why are we doing Y this way?"*
+- *"what did we decide about Z?"* / *"did we ever decide on Z?"*
+- *"is there a convention for"* / *"how do we usually do"*
+- *"where do I look for"* / *"where does X live"*
+- *"what happens when"* / *"what's the behavior if"*
+- *"are we using X or Y?"* / *"what's our stack for"*
+- *"is there already something for"* / *"do we have a"*
+- *"is it safe to change"* / *"what depends on this"*
 
-5. **Durable vs ephemeral separation.** Specs, decisions, architecture, runbooks are durable — they live in `/knowledge/docs`. Tasks and scratchpads are ephemeral — they live in `/knowledge/tasks` and can be summarized, archived, or deleted. Never mix the two.
+The pattern: the user is reaching for information that *should be* in `/knowledge`. Even if the answer might also be in the code, the knowledge layer has the **why** (rationale, rejected alternatives, edge cases) that the code does not.
 
-6. **Precision over completeness in retrieval.** When loading context, prefer small relevant slices over giant dumps. Token usage is a real cost; irrelevant context degrades reasoning.
+> **Antipattern to avoid:** answering from memory or from a quick grep of the code. If a knowledge layer exists, it is the source of truth for *intent*. Code is the source of truth for *current implementation*. They answer different questions.
 
-7. **Ask before writing low-confidence content.** A diff shows *what* changed; it rarely shows *why*, what alternatives were rejected, what edge cases the author had in mind, or what failure modes the runbook should anticipate. That knowledge lives in the user's head. When `/keep-compile` is about to write a high-stakes field (rejected alternatives in an ADR, edge cases in a new spec, the cause field of a runbook) and the diff doesn't unambiguously settle it, stop and ask. See the **Eliciting tacit knowledge** section below for the protocol — including when *not* to ask, so the workflow does not become an interrogation.
+### Write triggers — run `/keep-observe` then `/keep-compile`
+
+After or during non-trivial code changes in a repo that has `/knowledge/`:
+
+- New feature or extension of an existing one
+- Dependency / framework / runtime swap
+- Topology change (new service, new boundary, new flow)
+- Bug fix after an incident (runbook candidate)
+- Configuration change that affects runtime behavior
+
+### Drift triggers — run `/keep-check-drift`
+
+Before merging a PR, before declaring a task complete, when the diff modifies code that any spec/ADR/runbook references via `related:` patterns.
+
+### Idea triggers — run `/keep-idea`
+
+The user proposes something but explicitly does NOT want to implement it now. Phrases: *"not now but"*, *"park this"*, *"jot this down"*, *"I'm thinking we should"*, *"don't lose this idea"*, *"come back to this later"*, *"thought experiment"*, *"what if we"*.
+
+### When NOT to trigger
+
+- Trivial edits (typo, formatting, single-line fix with no semantic content).
+- Questions about general programming knowledge unrelated to this repo.
+- Questions whose answer is obvious from a top-level README and don't touch architecture.
+
+When in doubt, **lean toward triggering**. Under-triggering is the dominant failure mode.
+
+---
+
+## Core principles
+
+1. **Memory, not narration.** Capture rationale, edge cases, rejected alternatives, operational learnings. Skip implementation walkthroughs that re-narrate the code.
+
+2. **Knowledge has a consumer and an enforcement mechanism, or it is a lie.** A spec that no one reads and that no drift check verifies will silently diverge from reality. Every file in `/knowledge` has YAML frontmatter so `/keep-ask` can find it, `INDEX.md` can list it, and `/keep-check-drift` can match it against code. Files without frontmatter are unverified artifacts — fix them or delete them.
+
+3. **Bidirectional flow.** Knowledge influences code (the agent consults it before answering or implementing); code influences knowledge (changes are classified and proposed back). Ideas are the third channel: half-formed thoughts captured durably, later promoted into specs/ADRs.
+
+4. **Brownfield-first.** Work incrementally. Never require a full upfront documentation pass. Grow from real changes — or ingest pre-existing docs via `/keep-init` + `/keep-compile` with per-file approval.
+
+5. **Conservative compilation.** Never invent intent. Stick to what the diff and existing docs actually support. The agent's compulsion to elaborate is the enemy of trustworthy knowledge.
+
+6. **Minimal diffs.** When updating an existing knowledge file, change as little as possible. Preserve human wording verbatim.
+
+7. **Ask before writing low-confidence content.** A diff shows *what*, rarely *why*. When `/keep-compile` is about to write a high-stakes field (rejected alternatives in an ADR, edge cases in a new spec, root cause in a runbook-tagged spec) and the diff doesn't unambiguously establish it, stop and ask in **batch mode** (multiple correlated questions in one turn). See `references/elicitation.md`.
+
+8. **INDEX.md is derived, never authored.** It is regenerated from YAML frontmatter by `scripts/build_index.py`. If you find yourself editing INDEX.md by hand, you are introducing the drift this skill exists to prevent.
 
 ---
 
@@ -73,308 +92,110 @@ When in doubt, lean toward engaging and asking a quick check question rather tha
 ```
 /knowledge
 ├── docs/
-│   ├── specs/          — what the system should do (living specs)
-│   ├── decisions/      — why the system is the way it is (ADRs)
-│   ├── architecture/   — system topology, components, flows
-│   └── runbooks/       — operational knowledge, failure modes, fixes
-│
-├── tasks/              — ephemeral execution state (NOT durable memory)
-│
-└── INDEX.md            — auto-generated navigation map (updated only by /keep-compile)
+│   ├── specs/             ← what the system should do (per-domain subdirs)
+│   │                        - spec: behavioral spec
+│   │                        - spec + tag:runbook: failure modes / operational
+│   │                        - spec + tag:architecture: topology / boundaries
+│   └── decisions/         ← ADRs (flat, ADR-NNNN-slug.md)
+├── ideas/                 ← half-formed proposals (status: draft → promoted or deprecated)
+└── INDEX.md               ← auto-generated by scripts/build_index.py
 ```
 
-`/keep-init` scaffolds this layout. Empty subdirectories and a stub `INDEX.md` are fine — do **not** retroactively document the whole codebase.
+**Type vocabulary is deliberately small** — `spec`, `adr`, `idea`. Runbooks and architecture docs are *specs with a tag*, not separate types. v1 had four types and a `tasks/` folder for execution state; both were dropped. Execution state (active work in progress) belongs in your ticket tracker or in agent task lists, not in the durable knowledge layer — KEEP indexes things with a consumer and an enforcement mechanism, and ephemeral state has neither.
 
-For the precise format and conventions of each file type (spec template, ADR template, runbook template, architecture style), read `references/file_formats.md` when needed.
+For per-file format with full YAML frontmatter schema, read `references/file_formats.md`.
 
----
-
-## Monorepo support
-
-KEEP uses **a single `/knowledge/` directory at the repository root**, even in monorepos. There are no per-package knowledge directories.
-
-The convention inside the single zone:
-
-- `specs/` and `runbooks/` get a **per-package subdirectory** (`specs/auth-service/`, `runbooks/inference-api/`, `specs/shared/` for cross-cutting). `/keep-observe` infers the affected package from file paths in the diff; `/keep-compile` writes spec and runbook updates under the matching subdirectory.
-- `decisions/` is **flat**. ADRs are numbered sequentially across the whole monorepo. The decision title and **Related** links indicate scope.
-- `architecture/` is **flat**. One file per package (`auth-service.md`, `inference-api.md`) plus an `overview.md` for cross-cutting topology.
-- `INDEX.md` adds a `## Packages` section at the top listing each package's spec/runbook/architecture entry points.
-
-In a single-package repo this collapses to the simpler `specs/<area>/` convention with no `## Packages` section. All commands behave identically; only the file layout differs.
-
-For full details — the rationale, the cross-package decision tree, and worked monorepo examples — read `references/monorepo.md`.
+For monorepo conventions (single `/knowledge/` at root, per-package subdirs under `specs/`), read `references/monorepo.md`.
 
 ---
 
-## The five commands
+## The eight commands
 
-KEEP intentionally exposes a small, fixed set of commands. Each has a narrow contract — keep them separate; do not let one bleed into another.
+KEEP exposes a fixed set of commands. Each has a narrow contract. Do not let one bleed into another.
 
-### `/keep-init`
+### `/keep-init` — bootstrap
 
-**Purpose:** bootstrap KEEP in a repo. Scaffolds `/knowledge`, detects monorepo layout, scans for pre-existing documentation, and produces an ingestion proposal. Does **not** migrate.
+Scaffold `/knowledge/`, detect monorepo, scan for pre-existing docs, produce ingestion proposal. Does not migrate (that happens in `/keep-compile`). Appends KEEP workflow snippet to `AGENTS.md` / `CLAUDE.md` / `.cursorrules`. **Run once at adoption.**
 
-**Behavior:**
-- If `/knowledge` already exists, do not overwrite. Report state and confirm.
-- Detect monorepo shape (`pnpm-workspace.yaml`, package.json workspaces, Cargo workspace, `go.work`, top-level `apps/` `packages/` `services/`) and ask the user to confirm the package list before scaffolding per-package subdirs.
-- Create the skeleton (`docs/{specs,decisions,architecture,runbooks}`, `tasks/`, stub `INDEX.md`).
-- Run the pre-existing doc scan described in **Pre-existing documentation auto-detection** below. Output an ingestion proposal in the same format as `/keep-observe` ingestion mode.
-- Append the KEEP workflow snippet to `CLAUDE.md` / `AGENTS.md` / `.cursorrules` (see `references/setup.md`).
+### `/keep-ask <question>` — PRIMARY read
 
-**Hard rules:**
-- Never overwrite an existing `/knowledge` directory without explicit confirmation.
-- No migration during init. Files are *proposed* only; `/keep-compile` is the one that writes ingested content with per-file approval.
+Answer a question using `/knowledge/` with citations. Reads `INDEX.md`, filters by frontmatter `description`/`tags`/`domain`, opens 1-5 relevant files, synthesizes, cites every load-bearing claim with the file's `id` (e.g. `[SPEC-auth-jwt]`, `[ADR-0014]`). Read-only.
 
-### `/keep-retrieve <topic>`
+**If the knowledge layer doesn't cover the question, say so explicitly.** Do not fall back to generic knowledge presented as repo truth — that is the antipattern this command exists to prevent.
 
-**Purpose:** load small, focused context relevant to a task.
+### `/keep-retrieve <topic>` — low-level read
 
-**Behavior:**
-- Identify which knowledge files touch the topic (use `INDEX.md` as the primary map, then fall back to filename and content search if needed).
-- Surface only the relevant files; do not dump the whole `/knowledge` tree.
-- Return a short list grouped by category (Architecture / Decisions / Specs / Runbooks). Each item is just a path; the user can ask to open any of them.
+List paths grouped by type/tag, no content synthesis. Use only when you need to open the files yourself (e.g. about to implement). For "how does X work?" questions, `/keep-ask` is the right command.
 
-**Hard rules:**
-- No file writes. `/keep-retrieve` is read-only.
-- No speculation about what *might* be relevant from the code. Stick to what's indexed.
-- If `INDEX.md` is empty or missing, say so and suggest running `/keep-init` (first time) or `/keep-observe` + `/keep-compile` (to start populating it).
+### `/keep-observe [source]` — classify changes
 
-### `/keep-observe [source]`
+Classify a diff (git source) or a folder of docs (ingestion source). Output: per-category list of suggested updates referenced by `id`. No file modifications. Surfaces commit-message rationale verbatim. Combined git+docs signal — scans pre-existing docs near the diff path.
 
-**Purpose:** semantic analysis of changes, classifying their impact on the knowledge layer. Suggests updates — does **not** apply them.
+### `/keep-compile` — apply updates + regenerate INDEX
 
-**Sources accepted.** `/keep-observe` works with any of the following, in this order of preference:
+Take the previous `/keep-observe` (or `/keep-init`) output. For each suggested update: create/modify files with valid YAML frontmatter, run elicitation for high-stakes fields, follow ADR supersession protocol, handle ingestion with provenance comments. **As the last step, run `scripts/build_index.py` to regenerate `INDEX.md` from frontmatter** — never hand-edit the index.
 
-1. **A specific source the user names** — a branch (`/keep-observe feature/auth-refresh`), a PR (`/keep-observe PR#142` or a URL), a tag (`/keep-observe v2.3.0`), a commit range (`/keep-observe main..feature/x`), or a folder of existing documentation to ingest (`/keep-observe ./old-docs/`).
-2. **The working diff** — `git diff` against the branch's merge base, or against `main` / `master` / the default branch.
-3. **The last commit** — `git diff HEAD~1` as final fallback.
+### `/keep-check-drift [source]` — enforcement
 
-When a PR or branch is provided, also extract the **commit list with messages** — commit messages frequently carry the rationale that the diff alone hides ("switched from KServe because of CRD complexity"). When a tag is provided, compare against the previous tag.
+Detect drift between a specific diff and `/knowledge/`. For each affected file (matched via `related:` patterns), check behavioral drift (values/behavior changed), decisional drift (implements rejected alternative), operational drift (changes documented failure modes). Linter-style output, exit code 1 if drift detected. **Usable as a git pre-commit hook or CI gate.**
 
-**Combined git + docs signal.** Even when the source is a git artifact, scan for pre-existing docs under or near the touched paths (e.g. a diff in `services/auth/` should also pull `services/auth/README.md`, `services/auth/docs/*`, `docs/auth*`). Surface them as ingestion candidates *alongside* the diff classification — they often carry rationale the commits don't and should be folded into the same proposal.
+### `/keep-govern` — periodic hygiene
 
-**Pure-doc-folder mode.** When the source is a folder (`/keep-observe ./old-docs/`), shift into ingestion classification — classify each doc by likely target type, propose target paths, flag mixed content for split. See `references/brownfield.md` for the full heuristic catalog.
+Detect cumulative entropy: stale files, duplication, contradicting ADRs without supersedes, oversize files, TODO(KEEP) markers, ideas older than 30 days in `draft`, specs without `related:` patterns. Suggestions only. **Runs occasionally, not every cycle.**
 
-**Behavior:**
-- Gather changes from the source.
-- Categorize into: **Feature** (new or modified behavior), **Architecture** (structural/topological change), **Decision** (a choice with rejected alternatives that should be recorded), **Operational** (something a runbook should capture).
-- For each category, list the affected knowledge files and what kind of update they likely need.
-- Surface relevant **commit messages** that contain rationale-worthy phrases ("because", "instead of", "we tried", "this breaks", "incident", "rejected"). These are gold for ADR alternatives and runbook causes.
-- If a `CHANGELOG.md` exists in the repo, scan its unreleased section as a secondary signal — but the PR commit history is the primary source when both are available.
-- Output the classification only. No file modifications.
+> **Difference between `/keep-check-drift` and `/keep-govern`:** drift is correctness *now* on a specific diff (blocks merge). Govern is hygiene *over time* on the whole knowledge base (non-blocking). A file can pass drift but fail govern.
 
-**Hard rules:**
-- Never modify any file under `/knowledge`.
-- Be conservative: if a change is purely refactoring with no semantic impact, say so and suggest no updates.
-- If the source is empty, ambiguous, or unavailable, ask the user to clarify — do not guess.
-- Quote commit messages or doc fragments rather than paraphrasing them when they contain rationale signals — they are evidence the user can verify.
+### `/keep-idea <free-form description>` — capture
 
-See `references/observe_examples.md` for worked examples covering diffs, PRs, tags, and doc folders.
-
-### `/keep-compile`
-
-**Purpose:** apply the suggested updates from `/keep-observe` (or the ingestion proposal from `/keep-init`) to the durable knowledge layer.
-
-**Behavior:**
-- Take the previous `/keep-observe` (or `/keep-init`) output as input. If neither was run in this session, run `/keep-observe` first.
-- For each suggested update:
-  - **Updating an existing file:** make the smallest possible diff. Preserve all human-written content and rationale. Append or amend; do not rewrite.
-  - **Creating a new ADR:** only when the change involves a non-trivial choice with rejected alternatives. Number it sequentially (ADR-NNNN-short-slug.md). Use the template in `references/file_formats.md`. **If this ADR supersedes a previous one**, see the supersession protocol in `references/file_formats.md` — both files must be updated and cross-linked.
-  - **Updating specs:** add new requirements, edge cases, or acceptance criteria. Leave existing ones untouched unless the behavior actually changed.
-  - **Updating runbooks:** add new failure modes and mitigations based on real operational evidence.
-  - **Updating architecture:** only when topology changed.
-  - **Migrating a pre-existing doc (ingestion):** map source content into the target template, **quote source content verbatim** (no paraphrasing — restructure / dedup / typo fixes only), run elicitation for missing high-stakes fields, add a provenance comment `<!-- Migrated from <source> on YYYY-MM-DD -->`. Per-file approval — never migrate the folder in one shot. See `references/brownfield.md`.
-- **Add cross-references** when relevant: a spec that implements an ADR should link to it; an ADR that affects an architecture component should be linked from there. See the linking convention in `references/file_formats.md`.
-- **Apply the elicitation protocol** before writing high-stakes fields. For ADRs and new specs, run elicitation in **batch mode** (collect all answers first, then write); for runbooks and incremental updates use reactive mode. See `references/elicitation.md`.
-- After all knowledge file updates, **incrementally update `INDEX.md`**: only regenerate the sections affected by the changes (domains touched, new entities introduced, flows that crossed boundaries). Preserve the rest of `INDEX.md` byte-for-byte. The first-ever `/keep-compile` on a repo regenerates `INDEX.md` from scratch.
-- **Handle the `/knowledge/tasks` lifecycle**: see the task lifecycle section below.
-- Print a summary: what was created, what was updated, which task files were promoted or archived, and any updates you declined to make (with the reason).
-
-**Hard rules:**
-- Minimal diffs only. If you find yourself rewriting a paragraph, stop and reconsider.
-- No duplication. Before adding a new section, check whether it already exists elsewhere.
-- Never delete existing rationale, even if it looks outdated — mark it as superseded instead.
-- If `/keep-observe` was not run in this session, run it first.
-- **Before writing high-stakes fields**, apply the elicitation protocol. Do not invent rejected alternatives, edge cases, or root causes from the diff alone.
-- **Never auto-migrate task content** into durable docs without surfacing it to the user first.
-- **Per-file approval for ingestion.** No batch migration of doc folders.
-- **Source files are never modified.** Pre-existing docs are read-only — KEEP reads, never writes.
-- **Verify filesystem state before claiming any sequential or set-based fact.** Before assigning an ADR number, `ls` the `decisions/` directory and use the next available integer — never pre-number from memory or from the conversation flow. The same applies before claiming a domain doesn't exist, an entity isn't in the INDEX, or a file is missing. Check, don't assume.
-
-### `/keep-govern` *(periodic)*
-
-**Purpose:** detect knowledge entropy — stale docs, duplication, contradictions, oversized files. Suggests cleanup; never auto-deletes.
-
-**Behavior:**
-- Scan `/knowledge/docs` for:
-  - Files not touched in a long time (>6 months heuristic) where the corresponding code area has changed.
-  - Pairs of files whose titles or content overlap heavily.
-  - ADRs that contradict each other without an explicit supersedes link.
-  - Files that have grown beyond ~300 lines and should be split.
-  - **Files with `<!-- TODO(KEEP): ... -->` markers** — these signal incomplete knowledge from prior compiles where the user declined to answer elicitation questions. Surface them so they can be enriched now that context may be fresher.
-  - **INDEX.md with more than ~5 single-entry domains** — suggests the domain granularity is too fine; consider collapsing.
-- Scan `/knowledge/tasks` for **active tasks older than 30 days** and **archived tasks older than 90 days** (candidates for `_archive/` cleanup, never deleted).
-- Output suggestions grouped by action: *archive*, *merge*, *summarize*, *split*, *enrich*, *collapse*. Each suggestion explains why.
-- Wait for explicit user approval before applying any of the suggestions.
-
-**Hard rules:**
-- Suggestions only. Never auto-delete or auto-merge.
-- Preserve historical rationale. If archiving, move to `/knowledge/docs/_archive/` rather than deleting.
+Save a half-formed proposal to `/knowledge/ideas/<YYYY-MM-DD>-<slug>.md` with `type: idea`, `status: draft`. Search for prior art first — surface anything related. **Preserve the user's wording.** Promotion to a spec/ADR happens later through `/keep-compile`, with explicit approval. Ideas are NOT tasks (different lifecycle, different durability).
 
 ---
 
-## Pre-existing documentation auto-detection
+## YAML frontmatter is mandatory
 
-KEEP treats pre-existing markdown documentation as a first-class input source — equal in importance to git history. Two commands use this:
-
-- **`/keep-init`** scans the whole repo and produces the initial ingestion proposal.
-- **`/keep-observe`** (without a source argument, or with a git source) opportunistically scans paths near the diff and folds candidates into the same proposal.
-
-### Locations to scan
-
-These are the canonical places where pre-existing docs tend to live. Walk them recursively, excluding `node_modules`, `.git`, `dist`, `build`, `target`, `vendor`, `.venv`, and any path already under `/knowledge`:
-
-- `README.md` at the repo root and inside any package
-- `docs/`, `doc/`, `documentation/` at any depth
-- `ARCHITECTURE.md`, `ARCHITECTURE/`, `DESIGN.md`, `DESIGN/`
-- `RUNBOOK.md`, `RUNBOOKS/`, `runbook/`, `runbooks/`
-- `notes/`, `design-notes/`, `rfc/`, `rfcs/`, `adr/`, `decisions/`
-- `wiki/`, `.wiki/`
-- Top-level `*.md` other than typical project boilerplate (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, CHANGELOG)
-
-### Classification heuristics
-
-Classify each file by combining **heading-pattern signals** (structural) with **keyword signals** (semantic). When heading and keyword signals disagree, prefer the heading signal — structure is more reliable than wording. When neither signal is conclusive, flag as **unclear** and ask the user.
-
-**Likely spec** — heading pattern includes things like `## Endpoint`, `## API`, `## Behavior`, `## Requirements`, `## Acceptance criteria`, `## Inputs / Outputs`, `## Validation`, `## Edge cases`. Keywords: "shall", "must return", "is expected to", "given … when … then", "rejects", "accepts".
-
-**Likely runbook** — heading pattern includes `## Symptoms`, `## Detection`, `## Cause`, `## Mitigation`, `## Resolution`, `## Rollback`, `## Postmortem`, `## Recovery`. Keywords: "alert", "page", "on-call", "incident", "post-mortem", "RTO", "RPO", "rollback", "5xx", "p99", "OOM".
-
-**Likely ADR / decision** — heading pattern includes `## Context`, `## Decision`, `## Status`, `## Alternatives`, `## Consequences`, `## Trade-offs`. Keywords: "because", "instead of", "we chose", "we rejected", "we tried … but", "supersedes", "deprecates", "the trade-off is".
-
-**Likely architecture** — heading pattern includes `## Topology`, `## Components`, `## Flows`, `## Boundaries`, `## System overview`, `## Dependencies`, `## Data flow`. Keywords: "service mesh", "boundary", "owns", "depends on", "produces", "consumes", topology diagrams.
-
-**Mixed content** — the file matches multiple categories with substantive content for each (e.g. meeting notes that include a decision rationale + a runbook entry + scratch). Propose a split rather than guessing.
-
-**Discard candidates** — pure code snippets, dependency lists, build instructions, user-facing how-tos, todo lists. These are not durable knowledge; flag and let the user decide.
-
-### Target-path inference
-
-After classification, propose a target path:
-
-- **specs:** `/knowledge/docs/specs/<package-or-area>/<slug>.md`. Infer the package from the source path (`services/auth/docs/jwt.md` → `specs/auth/jwt.md`). In single-package repos, use `<area>` derived from filename or top heading.
-- **runbooks:** `/knowledge/docs/runbooks/<package-or-area>/<slug>.md` or `runbooks/shared/<slug>.md` for cross-cutting.
-- **ADRs:** `/knowledge/docs/decisions/ADR-NNNN-<slug>.md` where NNNN is the next available number (compute at compile time, not at observe — `/keep-observe` proposes `ADR-NNNN` as a placeholder).
-- **architecture:** `/knowledge/docs/architecture/<area>.md` (one file per package, plus `overview.md` for system-wide).
-
-When the source path strongly suggests a package (`packages/foo/docs/...`), use that package; otherwise ask the user.
-
-### Output format
-
-The classification output is the same shape as `/keep-observe` in ingestion mode (see `references/brownfield.md` for a worked example). Each candidate carries:
-
-- source path
-- proposed target type and path
-- one-line rationale ("matches the runbook template — has symptoms/cause/mitigation headings")
-- elicitation flags ("source lists alternatives but no rejection rationale — will need batch interview at compile time")
-
-Mixed-content files are presented with a proposed split; unclear files are listed separately for user input. **Nothing is written.** Migration only happens through `/keep-compile`, file-by-file, with explicit approval.
-
----
-
-## Task lifecycle
-
-`/knowledge/tasks` exists for ephemeral execution state — implementation plans, scratch notes, debug traces. Each task file carries a minimal YAML frontmatter that **`/keep-compile` and `/keep-govern` manage automatically** — the user is not expected to maintain it by hand:
+Every file in `/knowledge/docs/` and `/knowledge/ideas/` starts with:
 
 ```yaml
 ---
-status: active        # active | done | abandoned
-created: 2026-05-12
-topic: auth-refresh
+id: SPEC-auth-jwt
+title: "JWT validation"
+description: "Behavioral spec for JWT issuer/audience validation, expiry handling, and refresh flow on /auth/* endpoints"
+status: accepted               # draft | accepted | deprecated | superseded
+type: spec                     # spec | adr | idea
+domain: auth
+tags: [auth, jwt, security]    # 'runbook' and 'architecture' are reserved tags
+related:
+  - adr:ADR-0014
+  - test:internal/auth/*_test.go matching TestJWT*
+  - code:internal/auth/jwt.go
 ---
 ```
 
-The lifecycle in brief:
+The `description` field is the most load-bearing. Written as a *search snippet*, not a chapter heading. `/keep-ask` decides whether to load the file based on this string. Bad: `"Auth stuff"`. Good: `"Behavioral expectations for JWT validation: issuer/audience checks, expiry, secret rotation. Covers refresh flow and grace window."`.
 
-- **Creation** — task files are written freely during work. If created without frontmatter, `/keep-compile` inserts a default block on first touch.
-- **Promotion** — during `/keep-compile`, if a task contains content that looks like durable knowledge (rationale, edge case, observed failure), KEEP surfaces it as a promotion candidate. Migration happens only with user approval and the source task is preserved.
-- **Status transition** — when work concludes, `/keep-compile` updates `status` to `done` (work reflected in durable knowledge) or `abandoned` (work dropped).
-- **Archival** — `done` and `abandoned` tasks move to `/knowledge/tasks/_archive/<YYYY-MM-DD>-<name>.md` where the date comes from `created`. `active` tasks are never archived.
-- **Governance** — `/keep-govern` surfaces `active` tasks older than 30 days, archived tasks older than 90 days, and tasks whose `topic` doesn't match any domain.
+The `related` field uses **convention-based references** — `test:internal/auth/*_test.go matching TestJWT*` is a pattern, not a hard-coded list of file paths. This is what makes drift detection work without breaking on rename.
 
-**Hard rules:** never auto-promote without user approval; never let task content become the sole record of a durable fact; tasks are never indexed in `INDEX.md`; the frontmatter is managed by KEEP, not the user.
-
-For full operational detail, including how `/keep-compile` decides what to promote and how to handle tasks that span multiple compile runs, read `references/tasks.md`.
+Full schema, templates per type, supersession protocol, linking convention: `references/file_formats.md`.
 
 ---
 
 ## Eliciting tacit knowledge
 
-A diff is a poor source for *intent*. It shows the new code, not the alternatives the author considered and rejected, not the edge cases they had in mind, not the production incident behind a runbook entry. That information lives in the user's head. KEEP captures it by *asking*, not by inferring.
+A diff shows *what changed*. It rarely shows *why*, what alternatives were rejected, what edge cases the author had in mind. That information lives in the user's head. KEEP captures it by *asking*, not by inferring.
 
-This protocol applies primarily to `/keep-compile`, the only command that writes durable content. It is a principle, not a separate command — there is deliberately no `/elicit` step the user can skip.
+This protocol applies primarily to `/keep-compile`. Three rules:
 
-### When to ask
+1. **Ask only when all three are true:** the field is high-stakes (ADR rejected alternatives, spec edge cases, runbook root cause), you have low confidence (the diff supports multiple explanations), and the field is being *created or substantially extended*.
 
-Ask before writing if **all three** are true:
+2. **Batch mode for new ADRs and new specs.** Correlated fields. Ask all 2-3 questions in one turn (`ask_user_question`-style), then write in one pass. Reactive mode for runbooks and incremental updates.
 
-1. The field is **high-stakes** — its value carries information the diff alone cannot establish.
-2. You have **low confidence** — what the diff shows could be explained multiple ways, or critical context is missing.
-3. The field is being **created or substantially extended**, not just touched.
+3. **Cap at three questions per turn.** Show your tentative draft alongside the question — "Here's what I'd write based on the diff alone — does this miss anything?" gets faster better answers than open-ended interrogation.
 
-High-stakes fields, by file type:
+If the diff or its commit messages already contain explicit evidence ("switched from KServe because of CRD complexity"), do NOT re-ask. Quote the commit verbatim in the file.
 
-- **ADR — rejected alternatives, consequences.** A decision without rejected alternatives is not a decision; without consequences, it is not actionable. Never fabricate either.
-- **Spec — edge cases, acceptance criteria.** Code shows the happy path; specs must capture the cases the code handles deliberately and the criteria that prove it.
-- **Runbook — symptoms, causes.** Speculative runbooks are worse than no runbook. Only write what was actually observed in production.
-- **Architecture — boundaries, constraints.** What is intentionally outside the component, and what invariant must hold.
+If the user declines to answer, omit the section and insert `<!-- TODO(KEEP): rejected alternatives not captured -->`. `/keep-govern` surfaces these later when context may be fresher.
 
-### When not to ask
-
-Do **not** ask if any of the following:
-
-- You are updating an existing field with content the diff clearly supports (e.g. adding one requirement to an existing spec, where the diff plainly implements that requirement).
-- **The diff or its commit messages contain explicit evidence** for the high-stakes field. If a commit message says *"chose Ray Serve over KServe because of Python ergonomics; KServe's CRDs added too much complexity"*, the rejected alternative and its rationale are already on record — quote them into the ADR rather than re-asking. The user explicitly captured this knowledge; making them re-state it is friction without value. Quote the evidence verbatim in the file (with the commit SHA in a comment if helpful) so the source is traceable.
-- The user has just answered a question on the same topic in this session.
-- The change is purely operational (formatting, renaming) with no semantic content to capture.
-- You can write a conservative, factually-grounded entry without speculating — and the missing detail is *enrichment*, not load-bearing.
-
-The rule of thumb: **ask only for what the diff, commits, and conversation cannot already establish.** Elicitation is for tacit knowledge — knowledge that lives only in the user's head. Anything they already wrote down somewhere is not tacit anymore.
-
-### How to ask
-
-Four rules that keep elicitation from becoming an interrogation:
-
-1. **Choose batch vs reactive mode based on file type.**
-   - **Batch mode** for **new ADRs and new specs.** The load-bearing fields are correlated — rejected alternatives depend on context, consequences depend on the decision, edge cases depend on the requirements scope. Asking them one at a time wastes turns and produces inconsistent answers. Collect all the questions up front in a single turn (using `ask_user_input_v0` with multiple questions where possible), then write the file in one pass.
-   - **Reactive mode** for **runbooks and incremental updates to existing files.** Runbook fields are mostly independent. Incremental updates touch one thing at a time. Ask only what is needed for that specific update.
-
-2. **Cap at three questions per turn.** Whether batch or reactive. If a batch interview would require more than three questions, prioritize the load-bearing ones and flag the rest as follow-up for after the file is drafted.
-
-3. **Use structured inputs when the environment offers them.** On Claude.ai with the `ask_user_input_v0` tool available, present discrete options as tappable choices (single-select for one-of-N, multi-select for "which of these apply", `rank_priorities` for ordering trade-offs). Free-text only for genuinely open questions. This dramatically reduces friction. In terminal-only environments (Claude Code, Cursor without tappable UI), ask in plain text but still offer enumerated options the user can answer with a number or letter.
-
-4. **Show your tentative draft alongside the question.** "Here's what I'd write based on the diff alone — does this miss anything?" is more useful than an abstract "tell me the edge cases". The user reacts to concrete content much faster than to open questions.
-
-For the full taxonomy of which questions to ask for each file type, with good and bad examples and batch interview templates, read `references/elicitation.md`.
-
-### What to do with the answers
-
-Answers go **directly into the durable knowledge file** being written. Never into `/knowledge/tasks` as intermediate state — that creates a third place where knowledge lives and breaks the durable/ephemeral separation.
-
-**Partial answers in batch mode.** When you ask three questions in batch and the user answers only some of them (skips one, says "I don't know", or leaves a field blank), do not re-ask the unanswered questions in a follow-up turn. Treat each unanswered field individually:
-
-- If the field is **load-bearing** (rejected alternatives in an ADR, edge cases in a new spec) and unanswered, omit the section entirely and insert a TODO marker (see below).
-- If the field is **enrichment** (e.g. "what should we revisit later"), simply omit it from the file. No marker needed — its absence is not a problem.
-
-Write the file once with what you have. Pushing for the missing answers in a second turn is the interrogation pattern this protocol is designed to prevent.
-
-**When the user declines entirely** ("just write your best guess", "skip the questions"), write a conservative version that omits the uncertain fields entirely rather than fabricating them. An ADR with no `Alternatives considered` section is better than one with invented alternatives. Mark such files with a TODO marker for future enrichment:
-
-```md
-<!-- TODO(KEEP): rejected alternatives not captured at compile time -->
-```
-
-This makes them findable later by `/keep-govern` and signals honestly that the file is incomplete.
+For the full elicitation taxonomy per file type, read `references/elicitation.md`.
 
 ---
 
@@ -382,97 +203,70 @@ This makes them findable later by `/keep-govern` and signals honestly that the f
 
 ```
 First time on a repo:
-  /keep-init                       ← scaffold /knowledge + scan pre-existing docs
-  /keep-compile                    ← migrate ingestion candidates one by one (with elicitation)
+  /keep-init                         ← scaffold + scan pre-existing docs
+  /keep-compile                      ← migrate ingestion candidates one by one
 
-Ongoing:
-  /keep-retrieve <topic>           ← before starting work, load focused context
-  [implement code changes]
-  /keep-observe                    ← after changes, classify impact (git diff + nearby docs)
-  /keep-compile                    ← apply the suggested knowledge updates
-  /keep-govern                     ← periodically, not every cycle
+Every session, before answering:
+  /keep-ask <user's question>        ← MANDATORY on read triggers (see above)
+
+Every code change worth keeping:
+  /keep-observe                      ← classify the diff
+  /keep-compile                      ← apply updates + regen INDEX
+
+Before merge:
+  /keep-check-drift                  ← enforcement gate
+
+Capture without commitment:
+  /keep-idea <user's thought>        ← inbox
+
+Periodic:
+  /keep-govern                       ← hygiene, weekly at most
 ```
-
-When triggered proactively (user is making changes in a repo with `/knowledge` but hasn't invoked KEEP), suggest the workflow rather than silently running it:
-
-> "I notice this repo has a `/knowledge` directory and the change you just made touches the auth flow. Would you like me to run `/keep-observe` and propose knowledge updates?"
-
-For first-time adoption on a repo that already has docs lying around but no `/knowledge`:
-
-> "This repo has a `docs/` folder and an `ARCHITECTURE.md` but no `/knowledge`. Want me to run `/keep-init`? It'll scaffold the layout and propose how to migrate the existing docs — no writes until you approve them one by one."
-
-Wait for confirmation before running `/keep-compile`. The user owns the knowledge layer; the skill is an aid, not an autopilot.
 
 ---
 
-## Output formats
+## AGENTS.md snippet — install in the repo
 
-### `/keep-retrieve` output template
+`/keep-init` appends this to whichever entry file exists at the repo root (`CLAUDE.md`, `AGENTS.md`, `.cursorrules`). The triggering language is intentionally hard:
 
-```
-Relevant context for "<topic>":
+```md
+## KEEP — Knowledge layer for this repository
 
-Architecture:
-- knowledge/docs/architecture/<file>.md
+`/knowledge/` is the authoritative source of truth for:
+- WHAT this system does (specs)
+- WHY it is built this way (ADRs)
+- HOW it operates under failure (specs with tag `runbook`)
+- WHERE components live and connect (specs with tag `architecture`)
+- WHAT we've been thinking about but not yet committed to (ideas)
 
-Decisions:
-- knowledge/docs/decisions/ADR-NNNN-<slug>.md
+### Mandatory consultation before responding
 
-Specs:
-- knowledge/docs/specs/<area>/<file>.md
+Before answering ANY of these, run `/keep-ask <topic>` first:
+- Questions about system behavior, design, or history
+- Questions naming a feature, service, ADR, endpoint, or domain
+- Requests to implement, modify, refactor, or remove existing behavior
+- Any uncertainty about whether a decision or convention exists
 
-Runbooks:
-- knowledge/docs/runbooks/<file>.md
-```
+If `/keep-ask` returns "no indexed knowledge", say so explicitly in your
+answer — do NOT fall back to generic knowledge as if it were repo truth.
 
-Omit sections that have no matches. If nothing matches, say so plainly: *"No indexed knowledge for `<topic>` yet. Run `/keep-observe` after making changes to start building it."*
+### After non-trivial code changes
 
-### `/keep-observe` output template
+Run `/keep-observe` → `/keep-compile` before declaring the work done.
+A change that touches behavior, architecture, or operations without
+updating `/knowledge` is incomplete.
 
-```
-Detected changes:
+### Before merging
 
-Feature:
-- <one-line description of the behavioral change>
+Run `/keep-check-drift` on the diff. Drift exit-code 1 blocks merge.
 
-Architecture:
-- <one-line description of the structural change>
+### Periodic
 
-Operational:
-- <one-line description of the operational learning>
+`/keep-govern` weekly for hygiene.
 
-Decision:
-- <one-line description, if a real choice was made>
+### Capture, don't drop
 
-Suggested knowledge updates:
-- knowledge/docs/specs/<area>/<file>.md  (add: <what>)
-- knowledge/docs/decisions/ADR-NNNN-<slug>.md  (create)
-- knowledge/docs/runbooks/<file>.md  (add: <what>)
-
-Ingestion candidates from nearby docs:
-- ./services/auth/README.md → knowledge/docs/specs/auth/overview.md  (likely spec — matches API/Behavior headings)
-- ./docs/auth-flow.md → knowledge/docs/architecture/auth.md  (likely architecture — describes topology)
-```
-
-Omit empty categories. Be specific about *what* the update should add, not just *which* file. The ingestion section appears only when nearby pre-existing docs were detected.
-
-### `/keep-compile` output template
-
-```
-Created:
-- knowledge/docs/decisions/ADR-NNNN-<slug>.md
-
-Updated:
-- knowledge/docs/specs/<area>/<file>.md
-- knowledge/docs/runbooks/<file>.md
-
-Migrated (from ingestion):
-- knowledge/docs/specs/auth/overview.md  (from ./services/auth/README.md)
-
-Updated INDEX.md
-
-Skipped:
-- <file>  (reason: <why no update was needed>)
+Half-formed ideas → `/keep-idea "..."`. Don't lose them in chat.
 ```
 
 ---
@@ -482,24 +276,23 @@ Skipped:
 KEEP must not become:
 
 - a documentation generator that produces prose on demand
-- a project management or ticketing system
+- a project management or ticketing system (use your tracker; KEEP only stores durable knowledge)
 - a heavyweight SDD framework with upfront design ceremonies
 - an AI wiki that drowns the repo in auto-generated text
-- a workflow engine with lifecycle states and gates
+- a workflow engine with lifecycle states and approval gates
 
-If a request would push KEEP in any of these directions, push back. The skill's value comes from staying small.
+If a request would push KEEP in any of these directions, push back. The value comes from staying small.
 
 ---
 
 ## Reference files
 
-- `references/file_formats.md` — templates and conventions for specs, ADRs, runbooks, architecture docs, `INDEX.md`, and task frontmatter. Includes the cross-cutting **linking convention** and **ADR supersession** protocol. Read when creating or updating any knowledge file.
-- `references/observe_examples.md` — worked examples of `/keep-observe` classifications covering diffs, PRs, tags, and doc folder ingestion. Read when the current source is ambiguous.
-- `references/elicitation.md` — taxonomy of questions to ask for each file type, the evidence-first rule (when *not* to ask), batch vs reactive mode, and how to handle partial answers. Read before asking questions during `/keep-compile`.
-- `references/monorepo.md` — full monorepo layout, command behaviors per-package, and the decision tree for cross-package content. Read when working in a monorepo or when the user is setting up KEEP on one.
-- `references/brownfield.md` — operational detail for `/keep-init` scanning and `/keep-observe ./folder/` ingestion, including the full classification heuristic catalog and how to handle mixed-content source files. Read when adopting KEEP on an established project or importing knowledge from other agents.
-- `references/tasks.md` — full task lifecycle, promotion mechanics, status transition rules, and `/keep-govern` behavior on tasks. Read when handling `/knowledge/tasks/` content during `/keep-compile`.
-- `references/setup.md` — agent-instruction snippet for `CLAUDE.md` / `AGENTS.md` / `.cursorrules`, common adoption mistakes, and the verification loop. Read when running `/keep-init` or when the user is adopting KEEP for the first time.
+- `references/file_formats.md` — full YAML frontmatter schema, templates per type, linking convention, ADR supersession protocol. Read when creating or updating any knowledge file.
+- `references/observe_examples.md` — worked examples of `/keep-observe` classifications (diffs, PRs, tags, doc folder ingestion). Read when the source is ambiguous.
+- `references/elicitation.md` — taxonomy of high-stakes questions per file type, batch vs reactive mode, partial-answer handling. Read before asking during `/keep-compile`.
+- `references/monorepo.md` — monorepo layout and per-package routing for `specs/`. Read in a monorepo or when adopting on one.
+- `references/brownfield.md` — heuristic catalog for `/keep-init` doc scanning and `/keep-observe ./folder/` ingestion. Read when migrating pre-existing docs.
+- `references/setup.md` — the AGENTS.md snippet, common adoption mistakes, the verification loop. Read during `/keep-init`.
 
 ---
 
@@ -507,4 +300,6 @@ If a request would push KEEP in any of these directions, push back. The skill's 
 
 Code stores execution logic.
 
-KEEP stores everything around it — architecture, rationale, operational learnings, feature evolution — so that the repository remains *understandable* as it grows. The repository is not just source code; with KEEP, it is persistent engineering cognition.
+KEEP stores everything around it — architecture, rationale, operational learnings, evolving ideas — so the repository remains *understandable* as it grows. The value isn't "AI that writes code". It's "repositories that become living knowledge graphs an agent can keep in sync indefinitely".
+
+Every commit can either deepen that knowledge or rot it. The skill exists to make deepening the default path.
