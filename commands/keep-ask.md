@@ -24,3 +24,16 @@ Follow this contract (full detail in the skill's `/keep-ask` section):
 **Output shape**
 
 A direct answer to the question, followed by a short "Sources" footer listing the cited file ids and paths.
+
+**List mode (no synthesis)**
+
+When the user says something like *"just list the relevant files, don't synthesize"* or *"give me paths only"* — or when you (the implementing agent) only need to locate files before opening them yourself — skip steps 3-4 and return:
+
+```
+For "$ARGUMENTS":
+- [SPEC-auth-jwt] knowledge/docs/specs/auth/jwt.md  — JWT validation, issuer/audience checks, refresh flow
+- [ADR-0014]     knowledge/docs/decisions/ADR-0014-ray-serve.md  — Ray Serve adoption (supersedes ADR-0007)
+- [SPEC-auth-jwt-rotation] knowledge/docs/specs/auth/jwt-rotation.md  — runbook-tagged: secret rotation
+```
+
+Same selection logic (frontmatter filter, max ~5 files), no synthesis. This replaces the v1 `/keep-retrieve` command — one read command, two output shapes.

@@ -4,7 +4,7 @@
 
 A memory layer for agentic, spec-driven software development.
 
-Code evolves; the reasoning behind it usually doesn't get written down. KEEP keeps a small, structured `/knowledge` directory next to the code — specs, ADRs, tagged operational and architecture notes, and an ideas inbox — and exposes **eight** commands the agent uses to consult and maintain it as the codebase changes.
+Code evolves; the reasoning behind it usually doesn't get written down. KEEP keeps a small, structured `/knowledge` directory next to the code — specs, ADRs, tagged operational and architecture notes, and an ideas inbox — and exposes **seven** commands the agent uses to consult and maintain it as the codebase changes.
 
 ```
 /knowledge
@@ -20,7 +20,7 @@ Runbooks and architecture live as **specs with reserved tags**, not separate top
 
 ## Install
 
-**Claude Code plugin** — adds the skill plus **eight** real slash commands with autocomplete:
+**Claude Code plugin** — adds the skill plus **seven** real slash commands with autocomplete:
 
 ```text
 /plugin marketplace add CuriousDolphin/KEEP
@@ -40,8 +40,7 @@ Both paths run the same logic — the skill itself is the source of truth. The p
 | Command | Purpose | Writes? |
 |---|---|---|
 | `/keep-init` | Scaffold `/knowledge`, scan pre-existing docs, append KEEP snippet to `AGENTS.md` / `CLAUDE.md` / `.cursorrules` | No |
-| `/keep-ask <question>` | **Primary read** — answer from `/knowledge` with citations (`id` in frontmatter) | No |
-| `/keep-retrieve <topic>` | List relevant paths by type/tag (no synthesis); use before implementing | No |
+| `/keep-ask <question>` | **The read command** — synthesize an answer from `/knowledge` with `[id]` citations. Say *"just list paths"* for list-only output (no synthesis) when you're about to open the files yourself. | No |
 | `/keep-observe [source]` | Classify impact of changes (git diff, PR, folder of docs) | No |
 | `/keep-compile` | Apply suggested updates, migrate ingestion candidates, **regenerate `INDEX.md`** via `skills/KEEP/scripts/build_index.py` | Yes |
 | `/keep-check-drift [source]` | Drift between diff and knowledge (`related:` patterns); CI / pre-commit friendly (exit 1 on drift) | No |
@@ -50,8 +49,7 @@ Both paths run the same logic — the skill itself is the source of truth. The p
 
 **Typical flows**
 
-- **Questions** (`how`, `why`, `where`, `is it safe`): `/keep-ask` first — not ad-hoc grep from memory.
-- **Implementation prep** (you will open files yourself): `/keep-retrieve` if listing paths helps.
+- **Questions** (`how`, `why`, `where`, `is it safe`): `/keep-ask` first — not ad-hoc grep from memory. If you only need paths (because you'll open the files yourself), tell `/keep-ask` "just list paths".
 - **After meaningful code changes**: `/keep-observe` → `/keep-compile` (compile applies updates and refreshes the index).
 - **Before merge**: `/keep-check-drift` on the diff.
 - **Parked ideas** (not implementing now): `/keep-idea "..."`.
@@ -80,8 +78,8 @@ Regenerates INDEX.md from YAML frontmatter (build_index.py). Nothing hand-edited
 > /keep-ask how does JWT refresh work?
 Reads INDEX.md, opens 2–3 specs/ADRs, answers with [SPEC-…] / [ADR-…] citations.
 
-> /keep-retrieve auth flow
-Returns paths grouped by specs / decisions / ideas for your own deep read.
+> /keep-ask auth flow — just list paths, I'll read them myself
+Same filter logic, returns ids + paths + one-line descriptions (no synthesis).
 
 [implement JWT refresh]
 
@@ -128,7 +126,7 @@ Surfaces contradicting ADRs, oversize specs, old draft ideas, TODO(KEEP) markers
 
 ```
 .claude-plugin/           plugin and marketplace manifest
-commands/                 thin slash-command wrappers → skill steps (eight commands)
+commands/                 thin slash-command wrappers → skill steps (seven commands)
 skills/KEEP/              SKILL.md (source of truth) + references/ + scripts/
   scripts/build_index.py  regenerates /knowledge/INDEX.md from frontmatter
 ```

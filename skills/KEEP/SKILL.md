@@ -109,7 +109,7 @@ For monorepo conventions (single `/knowledge/` at root, per-package subdirs unde
 
 ---
 
-## The eight commands
+## The seven commands
 
 KEEP exposes a fixed set of commands. Each has a narrow contract. Do not let one bleed into another.
 
@@ -117,15 +117,16 @@ KEEP exposes a fixed set of commands. Each has a narrow contract. Do not let one
 
 Scaffold `/knowledge/`, detect monorepo, scan for pre-existing docs, produce ingestion proposal. Does not migrate (that happens in `/keep-compile`). Appends KEEP workflow snippet to `AGENTS.md` / `CLAUDE.md` / `.cursorrules`. **Run once at adoption.**
 
-### `/keep-ask <question>` — PRIMARY read
+### `/keep-ask <question>` — the only read command
 
 Answer a question using `/knowledge/` with citations. Reads `INDEX.md`, filters by frontmatter `description`/`tags`/`domain`, opens 1-5 relevant files, synthesizes, cites every load-bearing claim with the file's `id` (e.g. `[SPEC-auth-jwt]`, `[ADR-0014]`). Read-only.
 
+Two output shapes from the same command:
+
+- **Synthesis** (default): an answer with citations. Use for *"how does X work?"*, *"why did we choose Y?"*.
+- **List-only** (when the user says *"just list paths"* or you're about to open the files yourself before implementing): the same selection logic, but return file ids + paths + one-line descriptions, no synthesis. This replaces the v1 `/keep-retrieve` command — keeping a separate command for list-only mode created routing confusion without buying anything.
+
 **If the knowledge layer doesn't cover the question, say so explicitly.** Do not fall back to generic knowledge presented as repo truth — that is the antipattern this command exists to prevent.
-
-### `/keep-retrieve <topic>` — low-level read
-
-List paths grouped by type/tag, no content synthesis. Use only when you need to open the files yourself (e.g. about to implement). For "how does X work?" questions, `/keep-ask` is the right command.
 
 ### `/keep-observe [source]` — classify changes
 

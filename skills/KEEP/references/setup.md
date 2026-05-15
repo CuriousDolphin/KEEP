@@ -47,39 +47,23 @@ This produces structured, cross-linked knowledge files instead of a dump of lega
 
 ## Step 2 — tell agents how to use KEEP
 
-`/keep-init` appends the snippet below to whichever instruction file already exists at the repo root (`CLAUDE.md`, `AGENTS.md`, `.cursorrules`). If none exists, it asks which to create. The wording is intentionally short:
+`/keep-init` appends the canonical snippet to whichever instruction file already exists at the repo root (`CLAUDE.md`, `AGENTS.md`, `.cursorrules`). If none exists, it asks which to create.
 
-```md
-## KEEP workflow
+**The single source of truth for the snippet is the `## AGENTS.md snippet — install in the repo` section of `SKILL.md`.** Do not maintain a second copy here — the snippet drifts the moment two sources exist. `/keep-init` reads that section verbatim and appends it.
 
-This repository uses KEEP (Knowledge Engine for Engineering Persistence).
-Durable knowledge lives in `/knowledge/`: specs and ADRs under `docs/`, half-formed
-proposals under `ideas/`. Execution state (active work-in-progress) is NOT stored here
-— use your ticket tracker or agent task list for that.
+The snippet is intentionally hard:
 
-Workflow:
-- First-time setup: `/keep-init` scaffolds `/knowledge` and proposes how to migrate
-  any existing docs. Migration happens through `/keep-compile`, one file at a time.
-- Before working on a topic: `/keep-retrieve <topic>` to load focused context.
-- After non-trivial code changes: `/keep-observe` (accepts the current diff, or a
-  branch/PR/tag, or `./folder/` for ingesting existing docs). It also opportunistically
-  scans for pre-existing docs near the touched paths.
-- Then `/keep-compile` to apply the suggested knowledge updates.
-- Periodically: `/keep-govern` to detect stale or duplicated knowledge.
+- It frames `/keep-ask` as **mandatory** consultation before answering questions about behavior, design, history, or any uncertainty about conventions. The wording "Before answering ANY of these, run `/keep-ask <topic>` first" is the hammer that defeats the dominant failure mode (under-triggering on the read path).
+- It instructs the agent to **say so explicitly** when `/keep-ask` returns no indexed knowledge, rather than falling back to generic knowledge presented as repo truth.
+- It marks code changes that touch behavior/architecture/operations as **incomplete** until `/keep-observe` → `/keep-compile` has run. That last sentence is the one that does most of the work — without it, knowledge updates get skipped under deadline pressure.
+- It wires `/keep-check-drift` into the merge path (`exit-code 1 blocks merge`), and `/keep-govern` to weekly hygiene.
+- It carves out `/keep-idea` for half-formed thoughts so they don't get lost in chat.
 
-For ADRs and new specs, `/keep-compile` runs an elicitation interview (in batch) before
-writing — expect a small number of targeted questions about rejected alternatives, edge
-cases, or root causes when the diff alone doesn't establish them.
-
-The knowledge layer is not optional — code changes that affect behavior, architecture,
-or operations should be reflected in `/knowledge` before the work is considered complete.
-```
-
-That last sentence is the one that does most of the work. Without it, knowledge updates get skipped under deadline pressure.
+When auditing an adoption, the failure mode to look for is a softened snippet: someone removed the "mandatory" wording, or replaced "ANY of these" with "some of these", and the agent quietly stopped consulting `/knowledge` on questions. Restore the canonical version from `SKILL.md` and the read path comes back to life.
 
 ## Step 3 — optional starting content
 
-If the team already has a few obvious decisions worth capturing (the kind of thing that comes up in every onboarding conversation — "why are we on Ray Serve?", "why do we use Auth0?"), write one or two ADRs by hand on day one. This gives `/keep-retrieve` something to return immediately and sets the tone for the format.
+If the team already has a few obvious decisions worth capturing (the kind of thing that comes up in every onboarding conversation — "why are we on Ray Serve?", "why do we use Auth0?"), write one or two ADRs by hand on day one. This gives `/keep-ask` something substantive to return on the first question and sets the tone for the format.
 
 Do **not** try to write more than three or four. The point is to seed, not to backfill.
 
@@ -88,7 +72,7 @@ Do **not** try to write more than three or four. The point is to seed, not to ba
 On the next real code change, run the full cycle:
 
 ```
-/keep-retrieve <topic>      # before starting
+/keep-ask <topic>           # synthesize prior context, OR ask for list-only paths
 [make the change]
 /keep-observe               # classify impact (+ nearby docs)
 /keep-compile               # apply updates (with batch elicitation if needed)

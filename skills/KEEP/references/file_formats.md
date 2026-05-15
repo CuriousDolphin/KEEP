@@ -299,7 +299,7 @@ Status flow: `draft` → either promoted into a spec/ADR (via `/keep-compile`) o
 
 ## INDEX.md — auto-generated, not hand-maintained
 
-`INDEX.md` is regenerated from frontmatter by `scripts/build_index.py`. It is the entry point for `/keep-ask` and `/keep-retrieve` — both read it first.
+`INDEX.md` is regenerated from frontmatter by `scripts/build_index.py`. It is the entry point for `/keep-ask` — the command reads it first to decide which files to open.
 
 **Do not edit `INDEX.md` by hand.** The script:
 

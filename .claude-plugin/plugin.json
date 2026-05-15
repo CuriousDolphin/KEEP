@@ -1,5 +1,5 @@
 {
   "name": "keep",
-  "description": "KEEP — Knowledge Engine for Engineering Persistence. Agent skill for /knowledge (specs, ADRs, architecture, runbooks) and the /retrieve, /observe, /compile, /govern workflow.",
+  "description": "KEEP — Knowledge Engine for Engineering Persistence. Agent skill for a living /knowledge layer (specs, ADRs, ideas; runbook & architecture as tags) and a seven-command workflow: /keep-init, /keep-ask, /keep-observe, /keep-compile, /keep-check-drift, /keep-govern, /keep-idea.",
   "repository": "https://github.com/CuriousDolphin/KEEP"
 }
