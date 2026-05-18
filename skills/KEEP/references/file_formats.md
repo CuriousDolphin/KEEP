@@ -43,7 +43,75 @@ The v2 collapse: `spec` is the artifact type; `runbook` and `architecture` are t
 
 If you want a runbook-style file: `type: spec`, `tags: [runbook, ...]`, body follows the runbook template below. Same for architecture. `INDEX.md` auto-generates dedicated sections for both based on the tags.
 
-## Cross-cutting convention 2 — Linking between files
+## Cross-cutting convention 2 — Anchors (enforceable claims)
+
+`related:` patterns are loose — they tell you which files are *plausibly* affected but not which *values* must hold. **Anchors** are the strict counterpart: structured claims that `scripts/check_drift.py` verifies deterministically against source code. They live in the same frontmatter, under the `anchors:` key.
+
+Anchors are **opt-in per spec.** A spec without anchors is still valid; it just sits outside the drift gate. Add anchors only for facts that matter — typically 3-7 per spec, not 30.
+
+### Schema
+
+```yaml
+anchors:
+  - id: ttl                                    # short slug, used in the marker key for /keep-check-drift
+    claim: "Tokens expire after 5 minutes idle"   # human-readable description (verbatim from spec body)
+    kind: const                                  # const | function | test | manual
+    file: services/auth/jwt.go                   # path relative to repo root
+    symbol: TOKEN_TTL                            # identifier in the code
+    value: "5 * time.Minute"                     # required for kind=const; whitespace is normalized
+
+  - id: new_token_sig
+    claim: "NewToken takes audience, returns (token, error)"
+    kind: function
+    file: services/auth/jwt.go
+    symbol: NewToken
+    signature: "(aud string) (string, error)"   # required for kind=function
+
+  - id: grace_test
+    claim: "Grace window allows both pre- and post-rotation secrets"
+    kind: test
+    file: services/auth/jwt_test.go
+    symbol: TestGraceWindow_AcceptsBothSecrets   # test function (Go/Python) or test name string (TS jest/vitest)
+
+  - id: prod_cronjob
+    claim: "Production rotates JWT secrets every 90 days via cronjob"
+    kind: manual
+    file: infra/k8s/secrets/cronjob.yaml          # not a checkable language — reported as manual
+    notes: "Verified out-of-band via terraform state"
+```
+
+### Anchor kinds
+
+| `kind`     | Required fields                | What `/keep-check-drift` verifies                                                     |
+|------------|--------------------------------|----------------------------------------------------------------------------------------|
+| `const`    | `file`, `symbol`, `value`       | A top-level `const`/`var`/assignment of `symbol` exists with the given `value`. Whitespace is normalized; commented declarations are ignored. |
+| `function` | `file`, `symbol`, `signature`   | A function `symbol` is declared with the given parameters and return type. Multiline declarations and trailing commas are normalized. |
+| `test`     | `file`, `symbol`                | A test exists for `symbol` AND is not skipped (`t.Skip`, `@pytest.mark.skip`, `pytest.skip(...)`, `test.skip(...)`, `xtest`, `xit` all count as skipped). |
+| `manual`   | `file`                          | Nothing. Reported in the dashboard as a known external dependency; never causes failure. |
+
+### Languages supported
+
+Go (`.go`), Python (`.py`), TypeScript (`.ts`/`.tsx`). Other extensions surface as `missing` — anchor declared but not verifiable. Either change the binding to point at a checkable file, or use `kind: manual` and explain in `notes`.
+
+### Drift vs validation
+
+Two failure modes during `/keep-check-drift`:
+
+- **drift** — symbol found, but value/signature doesn't match the anchor. The user must reconcile (update the spec OR fix the code).
+- **missing** — target file or symbol absent. The user must restore the binding OR remove the anchor.
+
+A spec with an invalid anchor block (missing `value` on a `kind: const`, unknown `kind`, etc.) surfaces a `_validation` error during check-drift — fix the frontmatter before drift detection can run on that spec.
+
+### How anchors get created
+
+Two paths:
+
+1. **Hand-written** during spec authoring or `/keep-compile`. The agent or user identifies the load-bearing claims and writes the block.
+2. **Suggested by `/keep-compile`** when it writes a new spec from a diff: concrete values in the diff (literals assigned to constants, function signatures, test names) become candidate anchors. The user accepts or rejects each.
+
+Anchors are NOT created speculatively. A claim that the diff doesn't explicitly establish (rejected alternatives, edge cases, root cause) becomes a `<!-- TODO(KEEP) -->` marker in the body, not a phantom anchor.
+
+## Cross-cutting convention 3 — Linking between files
 
 The `related:` block in the frontmatter is the *machine-readable* cross-reference. For prose, you can also add a `## Related` section at the bottom of the body with relative markdown links:
 

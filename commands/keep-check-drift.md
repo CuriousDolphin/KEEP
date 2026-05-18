@@ -1,35 +1,82 @@
 ---
-description: Detect drift between code changes and /knowledge/ — linter-style enforcement
-argument-hint: [branch | PR | commit-range — defaults to working tree diff]
+description: Detect drift between code and /knowledge/ — deterministic anchor verification, CI-friendly (exit 1 on drift).
+argument-hint: [--spec SPEC-id] [--changed] [--verbose]
 ---
 
-Use the `keep` skill in **check-drift mode**. Input source: `$ARGUMENTS` (defaults to working tree diff against the merge base / main).
+Use the `keep` skill in **check-drift mode**. This is the **enforcement gate** — every PR, every pre-merge.
 
-This is the **enforcement mechanism**: every commit, every PR, every pre-merge gate. Unlike `/keep-govern` which surfaces cumulative entropy, `/keep-check-drift` answers a precise question:
+Unlike `/keep-govern` (hygiene over time, non-blocking), `/keep-check-drift` answers a precise question:
 
-> *"Does this specific change introduce a contradiction with the knowledge layer as it stands right now?"*
+> *"Do the anchors declared in spec frontmatter still hold against the current code?"*
 
-Follow this contract (full detail in the skill's `/keep-check-drift` section):
+It's backed by `scripts/check_drift.py` — a deterministic, stdlib-only Python script. No LLM in the loop, no probabilistic verdicts. Exit code 1 blocks merge.
 
-1. **Resolve the source** (working tree diff, branch, PR, commit range). If ambiguous, ask.
-2. **Identify affected knowledge files** via the `related:` patterns in frontmatter. A diff touching `internal/auth/jwt.go` matches every spec/ADR whose `related` field has `code:internal/auth/*` or `code:internal/auth/jwt.go`.
-3. **For each affected file, check three drift types:**
-   - **Behavioral drift** — the diff changes a value or behavior that the spec explicitly documents (timeout values, error messages, endpoint paths, status codes). Surface the contradiction with the exact spec passage.
-   - **Decisional drift** — the diff implements an approach that an ADR explicitly rejected. Quote the rejection rationale.
-   - **Operational drift** — the diff changes failure modes that a runbook-tagged spec documents (recovery steps, mitigation triggers).
-4. **Output linter-style findings.** One block per finding: file:line of the change, affected file id, quoted passage from the affected file, one-line suggestion of direction. No file modifications.
-5. **Exit code:** `0` if no drift, `1` if drift detected. Usable as a git pre-commit hook or CI gate.
+## How it works
 
-**Hard rules**
+For every anchor declared in spec frontmatter under `/knowledge/`, the script:
+
+1. Resolves the binding (file + symbol + expected value/signature).
+2. Reads the target file (Go, Python, or TypeScript).
+3. Applies a language-specific regex matcher per anchor kind:
+   - **const**: `const X = …` declaration matches expected value (whitespace-tolerant)
+   - **function**: signature equality (params + return)
+   - **test**: test exists AND is not skipped (`t.Skip`, `@pytest.mark.skip`, `test.skip(...)`, `xtest`, etc. all count as skipped)
+   - **manual**: reported but never causes failure (external verification)
+4. Aggregates results, prints a report, exits 0 (no drift) or 1 (drift).
+
+## Invocation
+
+```bash
+python3 <skill-path>/scripts/check_drift.py [flags]
+```
+
+The agent, when asked to "check for drift", runs this script with appropriate flags rather than re-implementing the matching with an LLM. Flags:
+
+- `--knowledge <path>` — defaults to `./knowledge`
+- `--repo <path>` — defaults to the parent of `--knowledge`
+- `--spec SPEC-id` — limit to a single spec
+- `--changed` — only check anchors whose target file appears in `git diff` (CI / pre-commit shortcut)
+- `--verbose` / `-v` — show OK results too, not just drift
+
+Exit codes:
+- `0` — no drift
+- `1` — at least one anchor in drift or referencing a missing file
+- `2` — usage error (e.g. `/knowledge/` missing)
+
+## When to wire as a hook
+
+The script is designed to be wired as a **git pre-commit hook** or a **CI step**:
+
+```yaml
+# Example .github/workflows/keep-drift.yml
+- run: python3 skills/KEEP/scripts/check_drift.py --changed
+```
+
+Or as a local pre-commit hook (`.git/hooks/pre-commit`):
+
+```bash
+#!/bin/sh
+python3 skills/KEEP/scripts/check_drift.py --changed
+```
+
+If exit code is 1, the PR is blocked until either the spec is updated or the code change is reverted.
+
+## What this is NOT
+
+- **Not a fixer.** The detector does not know whether the spec or the code is wrong. The user decides.
+- **Not opinionated about prose.** Only `anchors:` frontmatter entries are checked. Plain-text claims in the spec body are not parsed.
+- **Not an LLM call.** Pure regex. Predictable, fast (<30ms for hundreds of anchors), reproducible across runs.
+
+## Hard rules
 
 - No file writes. Detection only.
-- The detector is *not* a fixer — it does not know whether the spec or the code is wrong. The user decides.
-- Quote evidence verbatim. A finding without a specific quoted passage from the affected file is noise.
-- Be conservative: a purely structural refactor (no behavioral change) should produce zero findings even if it touches files referenced by specs.
+- Specs without `anchors:` in frontmatter contribute nothing to the check. They produce neither warnings nor failures — anchoring is opt-in per spec.
+- A purely mechanical refactor (rename, find-and-replace) that does not change any anchored value or signature produces zero findings.
+- If the script reports `missing` for an anchor (target file gone), that *is* drift — the symbol the spec points to no longer exists. Either restore the file or remove the anchor.
 
-**Difference from `/keep-govern`** — read both contracts in the SKILL.md to understand:
+## Difference from `/keep-govern`
 
-- `/keep-check-drift` = correctness *now*, on a specific diff, blocks merge.
-- `/keep-govern` = hygiene *over time*, on the whole knowledge base, non-blocking.
+- `/keep-check-drift` — correctness **now**, on a specific diff, deterministic, blocks merge.
+- `/keep-govern` — hygiene **over time**, on the whole knowledge base, suggestion-only, non-blocking.
 
 A file can pass drift (matches today's code) but fail govern (stale, oversized, duplicated). And vice versa.

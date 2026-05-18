@@ -19,7 +19,7 @@ Follow this contract (full detail in the skill's `/keep-ask` section):
 - The answer must be derived from `/knowledge/`. If you cite the code, mark it clearly as "from the code, not from the knowledge layer".
 - Follow `related:` links in frontmatter when they bear on the question — a spec may point to an ADR with the actual rationale, and you should include both.
 - Respect `status`: `superseded` entries are historical; `deprecated` are still informational but moving away. Never present them as the current state without flagging.
-- If `INDEX.md` is missing or empty, say so and suggest `/keep-init` (first time) or `/keep-observe` + `/keep-compile` (to start populating).
+- If `INDEX.md` is missing or empty, say so and suggest `scripts/init.sh` (first time) or `/keep-compile` (to start populating from a recent diff).
 
 **Output shape**
 

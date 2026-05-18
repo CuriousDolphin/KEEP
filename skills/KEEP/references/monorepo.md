@@ -66,7 +66,7 @@ level. Cross-cutting: shared retry conventions in [SPEC-shared-api-conventions].
 
 If the question doesn't name a package, `/keep-ask` searches across all package subdirectories without grouping.
 
-### `/keep-observe` — diff classification
+### `/keep-compile` phase 1 — diff classification
 
 Infer affected packages from the file paths in the diff:
 
