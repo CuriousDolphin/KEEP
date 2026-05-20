@@ -1,6 +1,6 @@
 ---
 name: keep
-description: "Living /knowledge layer for a code repo — specs, ADRs, ideas, with runbook and architecture as tags. CONSULT whenever the user asks how the system works, why a decision was made, what conventions exist, or whether a change is safe — even without naming KEEP. ALSO trigger on non-trivial changes that affect behavior/architecture/operations in a /knowledge-enabled repo, doc ingestion, parked ideas ('not now but', 'what if we'), and PR drift checks. SKIP for generic programming Q&A, library docs, pure mechanical refactors, and repos without /knowledge."
+description: "Living /knowledge layer for a code repo — specs, ADRs, ideas, with runbook and architecture as tags, and anchored facts that drift-detection verifies deterministically. CONSULT whenever the user asks how the system works, why a decision was made, what conventions exist, or whether a change is safe — even without naming KEEP. ALSO trigger on non-trivial changes that affect behavior/architecture/operations in a /knowledge-enabled repo, brownfield doc cordoning, parked ideas ('not now but', 'what if we'), pre-merge drift checks, and questions about anchor coverage. SKIP for generic programming Q&A, library docs, pure mechanical refactors, and repos without /knowledge."
 ---
 
 # KEEP — Knowledge Engine for Engineering Persistence
@@ -109,22 +109,29 @@ For monorepo conventions (single `/knowledge/` at root, per-package subdirs unde
 
 ---
 
-## The six commands + one bootstrap script
+## The seven commands
 
-KEEP exposes a narrow surface: six slash commands (one root, five action verbs) plus a one-time bootstrap script.
+KEEP exposes a narrow surface: seven slash commands. One root, one bootstrap, five action verbs.
 
 ### `/keep` — root command / dashboard
 
 Run with no args. Two modes, picked automatically by `scripts/status.py`:
 
-- **If `/knowledge/` doesn't exist** — KEEP is uninitialized. The command asks the user *"Want me to run `scripts/init.sh` to scaffold `/knowledge/` and append the AGENTS.md snippet?"*. On yes → runs the bootstrap script, then re-shows the dashboard. On no → two-line explanation of KEEP and stops.
-- **If `/knowledge/` exists** — prints a dashboard: counts of specs/ADRs/ideas, anchor coverage %, and adaptive hints (e.g. *"anchor coverage is low — consider adding anchors so /keep-check-drift is deterministic"*). Then a one-line reminder of the five action commands.
+- **If `/knowledge/` doesn't exist** — KEEP is uninitialized. The command tells the user to run `/keep-init` and stops. `/keep` is read-only by contract — it never bootstraps silently.
+- **If `/knowledge/` exists** — prints a dashboard: counts of specs/ADRs/ideas, **anchor coverage %** (from `scripts/coverage.py`), and adaptive hints (e.g. *"anchor coverage in domain X is 0% — consider adding anchors so /keep-check-drift is deterministic"*). Then a one-line reminder of the action commands.
 
 `/keep` is the only command an agent should reach for when uncertain *which* sub-command applies. It never writes anything; it routes.
 
-### `scripts/init.sh` — one-time bootstrap (NOT a slash command)
+### `/keep-init` — bootstrap (one-time per repo)
 
-Invoked by `/keep` on first run, or run directly from the repo root: `bash <skill-path>/scripts/init.sh`. Scaffolds `/knowledge/`, detects monorepo layout, scans for pre-existing docs (READMEs, ARCHITECTURE, RUNBOOKS, ADR folders), and appends the KEEP workflow snippet to whichever instruction file exists (`AGENTS.md` / `CLAUDE.md` / `.cursorrules`). Refuses to overwrite an existing `/knowledge/`. Bootstrap is a one-time job — making it a slash command misled users into thinking it was part of the daily loop.
+Use when the repo has no `/knowledge/`, or when `/keep` reports "uninitialized" and the user wants to proceed. Always asks for explicit consent before writing. Does, in order:
+
+1. Runs `scripts/init.sh` — scaffolds `/knowledge/docs/{specs,decisions}/`, `/knowledge/ideas/`, INDEX.md. Detects monorepo. Appends KEEP snippet to AGENTS.md (or CLAUDE.md / .cursorrules).
+2. Installs `SPEC-000-keep.md` from `references/templates/` into `/knowledge/docs/specs/keep/` — a self-spec describing KEEP's conventions inside the knowledge layer, so they survive the skill being uninstalled.
+3. Runs `scripts/build_index.py` to refresh INDEX.md.
+4. Mentions (but does NOT install) the optional CI / pre-commit setup. See `references/setup.md` step 5 for copy-paste templates.
+
+Refuses to overwrite an existing `/knowledge/`. Re-running on an already-initialized repo is a no-op + status print.
 
 ### `/keep-ask <question>` — the only read command
 
@@ -137,16 +144,18 @@ Two output shapes from the same command:
 
 **If the knowledge layer doesn't cover the question, say so explicitly.** Do not fall back to generic knowledge presented as repo truth — that is the antipattern this command exists to prevent.
 
-### `/keep-compile [source] [--dry]` — the only write command
+### `/keep-compile [source] [--dry] [--migrate]` — the only write command
 
 Two phases in one command:
 
-1. **Observe** — classify the diff/source (`git diff`, branch, PR, tag, commit range, or a folder of pre-existing docs). Categorize each change as Feature / Architecture / Decision / Operational / Refactor. Output: suggested updates referenced by `id`. No writes yet.
-2. **Compile** — apply each suggested update: create/modify files with valid YAML frontmatter, run elicitation in batch for high-stakes fields, follow ADR supersession protocol, handle ingestion with provenance comments. Then regenerate `INDEX.md` via `scripts/build_index.py`.
+1. **Observe** — classify the diff/source (`git diff`, branch, PR, tag, commit range, or a file/folder of pre-existing docs). Categorize each change as Feature / Architecture / Decision / Operational / Refactor. **Detect renames** in the diff and cross-reference existing anchors so a symbol rename surfaces as a proposed anchor update *before* it causes a drift failure at merge time. Output: suggested updates referenced by `id`. No writes yet.
+2. **Compile** — apply each suggested update: create/modify files with valid YAML frontmatter, **propose anchor candidates from concrete values in the diff** (the default, not optional), run elicitation in batch for high-stakes fields, follow ADR supersession protocol. Then regenerate `INDEX.md` via `scripts/build_index.py` (which also refreshes the Backlinks section).
 
-Pass `--dry` to stop after phase 1 ("show me what would change before I commit to it"). Default invocation runs both phases.
+Pass `--dry` to stop after phase 1 ("show me what would change before I commit to it").
 
-The two phases are one command because in practice nobody runs observe without then running compile — splitting them produced friction with no upside. Earlier versions of KEEP had separate `/keep-observe` and `/keep-compile`; v2.2 collapsed them.
+**Brownfield default is cordon-off, not ingest.** Passing a folder source writes a single cordon ADR declaring the folder out of scope for `/keep-ask` and `/keep-check-drift`. To migrate a specific legacy file into the knowledge layer, the user explicitly passes `--migrate` on that file — single-file only, no batch migration. The friction is the feature; see `references/brownfield.md` for the rationale (an unverified spec poisons every downstream query, so the default is "don't touch").
+
+The observe+compile collapse into one command, and the new anchor / rename / cordon defaults, are the v4 simplifications. Earlier versions had separate `/keep-observe` and treated brownfield as ingest-by-default; both produced friction with no upside.
 
 ### `/keep-check-drift [source]` — enforcement (deterministic)
 
@@ -204,6 +213,22 @@ Full schema, templates per type, supersession protocol, linking convention: `ref
 
 ---
 
+## How the skill asks questions
+
+KEEP commands ask the user for input in several situations: confirming `/keep-init`, choosing migrate vs cordon for a legacy doc, deciding what to do with contradicting claims during a migration, filling rejected-alternatives for a new ADR. The form of the question matters more than people think — open-ended questions get slow, unfocused answers; structured questions with explicit options get fast, decisive ones.
+
+Apply this hierarchy:
+
+1. **Binary decisions** (proceed / abort, e.g. `/keep-init` consent): yes/no with the default marked explicitly. `Scaffold /knowledge/ and append AGENTS.md? [y/N]` — the capital N is the default.
+
+2. **Choice between 2-4 named options** (migrate vs cordon, classify as spec vs ADR vs idea): present them as a lettered or numbered list with a one-line description each and a marked default. Accept the letter, the keyword, or natural language — the user shouldn't need to remember a flag.
+
+3. **Granular decisions in batch** (per-row verification of legacy claims, per-field ADR elicitation): one turn, multiple rows, each row offers the same small set of actions. Accept shorthand like `1b 2a 3c` or `all (a)`. Cap at ~5 rows per batch — beyond that, split.
+
+4. **Free-form input** (ADR `## Context`, idea body, rationale prose): only when the user's exact words are the value. Always show a tentative draft alongside the question — *"Here's what I'd write based on the diff alone — does this miss anything?"* gets faster, better answers than *"What's the context?"*.
+
+When in doubt, lean toward more structure. A migrate/cordon decision asked as *"What do you want to do with this file?"* will produce a slower, vaguer answer than the same question asked as *"(a) migrate, (b) cordon, default (b)"*. The cost of the structure is one extra sentence of skill prose; the benefit is the user can answer in one keystroke.
+
 ## Eliciting tacit knowledge
 
 A diff shows *what changed*. It rarely shows *why*, what alternatives were rejected, what edge cases the author had in mind. That information lives in the user's head. KEEP captures it by *asking*, not by inferring.
@@ -226,24 +251,27 @@ If the user declines to answer, omit the section and insert `<!-- TODO(KEEP): re
 
 ```
 First time on a repo:
-  /keep                             ← dashboard. If /knowledge missing, offers to run init.sh.
-  /keep-compile ./docs/             ← migrate ingestion candidates with approval
+  /keep                             ← dashboard. If /knowledge missing, points the user to /keep-init.
+  /keep-init                        ← scaffold + install SPEC-000-keep + append AGENTS.md snippet (asks consent)
+  /keep-compile ./docs/             ← cordon-off pre-existing docs (default — writes a cordon ADR, doesn't ingest)
+  /keep-compile docs/auth/jwt.md --migrate   ← opt a specific legacy file into the knowledge layer
 
 Every session, before answering:
   /keep-ask <user's question>       ← MANDATORY on read triggers (see above)
 
 Every code change worth keeping:
-  /keep-compile                     ← classify + write + regen INDEX in one shot
+  /keep-compile                     ← classify + propose anchors + write + regen INDEX in one shot
   /keep-compile --dry               ← (or: dry-run if you want to preview first)
 
 Before merge:
   /keep-check-drift                 ← deterministic enforcement gate (exit 1 blocks merge)
+                                      Best wired into CI / pre-commit — see references/setup.md step 5
 
 Capture without commitment:
   /keep-idea <user's thought>       ← inbox
 
 Periodic:
-  /keep                             ← dashboard / status check
+  /keep                             ← dashboard / status check (includes anchor coverage)
   /keep-govern                      ← hygiene, weekly at most
 ```
 
@@ -311,12 +339,23 @@ If a request would push KEEP in any of these directions, push back. The value co
 
 ## Reference files
 
-- `references/file_formats.md` — full YAML frontmatter schema, templates per type, linking convention, ADR supersession protocol. Read when creating or updating any knowledge file.
+- `references/file_formats.md` — full YAML frontmatter schema, anchors block, templates per type, linking convention, ADR supersession protocol. Read when creating or updating any knowledge file.
 - `references/monorepo.md` — monorepo layout and per-package routing for `specs/`. Read in a monorepo or when adopting on one.
-- `references/brownfield.md` — heuristic catalog for doc scanning during `init.sh` and folder-ingestion via `/keep-compile ./folder/`. Read when migrating pre-existing docs.
-- `references/setup.md` — single source of truth for the AGENTS.md snippet, common adoption mistakes, the verification loop. Read once at adoption.
+- `references/brownfield.md` — cordon-off-by-default policy, `--migrate` workflow for opt-in per-file migration, classification heuristics. Read before invoking `/keep-compile` on a folder.
+- `references/setup.md` — single source of truth for the AGENTS.md snippet, common adoption mistakes, the verification loop, and copy-paste templates for wiring `/keep-check-drift` into pre-commit / GitHub Actions. Read once at adoption.
+- `references/templates/SPEC-000-keep.md` — the self-spec installed by `/keep-init` into `/knowledge/docs/specs/keep/`. Documents KEEP's conventions inside the knowledge layer so they outlast the skill.
 
 ---
+
+## Anchor coverage — the silent KPI
+
+Specs without anchors still work, but they sit outside the drift gate — they are claims without enforcement. The silent KPI of a KEEP-enabled repo is **what percentage of load-bearing code symbols (top-level constants, exported functions, named tests, routes) are referenced by at least one anchor**.
+
+`scripts/coverage.py` reports this number per domain and per file. The `/keep` dashboard surfaces the aggregate. When `/keep-compile` writes a new spec, propose anchors *by default* — anchor proposal is part of writing the spec, not an optional add-on. The rule is "no anchor without evidence" (only propose anchors for values actually present in the diff), not "no anchor at all". See `commands/keep-compile.md` for the heuristic and `scripts/coverage.py` for the measurement.
+
+## CI / pre-commit integration (recommended, not auto-installed)
+
+`/keep-check-drift` is deterministic and CI-friendly — exit code 1 blocks merge. It becomes a real enforcement gate only when wired into your team's pre-commit hook or CI workflow. KEEP does NOT install hooks or workflows on the user's behalf; that kind of side effect is invasive. Instead, `references/setup.md` (step 5) carries copy-paste templates for both pre-commit and GitHub Actions. When `/keep-init` finishes, the agent mentions this once and lets the user opt in.
 
 ## Core insight
 

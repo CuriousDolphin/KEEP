@@ -17,12 +17,13 @@ Follow this contract:
 
    - **Exit 0** — `/knowledge/` exists and the status was printed. Show the user the script's output verbatim. Then add a one-line reminder of the five command verbs (see below). Stop.
 
-   - **Exit 2** — `/knowledge/` does not exist. KEEP is not initialized in this repo. Ask the user:
+   - **Exit 2** — `/knowledge/` does not exist. KEEP is not initialized in this repo. Tell the user:
 
-     > KEEP is not initialized in this repo. Want me to run `scripts/init.sh` to scaffold `/knowledge/`, scan for any existing docs to ingest, and append the KEEP workflow snippet to `AGENTS.md` (or `CLAUDE.md` / `.cursorrules` if either exists)?
+     > KEEP is not initialized in this repo. Run `/keep-init` to scaffold `/knowledge/`, install `SPEC-000-keep.md`, and append the KEEP workflow snippet to `AGENTS.md` (or `CLAUDE.md` / `.cursorrules`). It will ask for explicit confirmation before writing anything.
 
-     - If the user says **yes**: run `bash <skill-path>/scripts/init.sh` from the repo root. Show the script's output. Then re-run `status.py` and show the resulting dashboard.
-     - If the user says **no**: explain in two sentences what KEEP is (*a living knowledge layer for the repo — specs, ADRs, ideas, with anchored facts that drift-check catches*) and stop. Do not attempt anything else.
+     Do NOT silently run `/keep-init` yourself — `/keep` is read-only by contract. The user invokes init explicitly.
+
+     If the user seems unsure whether KEEP is right for the repo, give the two-sentence pitch (*a living knowledge layer for the repo — specs, ADRs, ideas, with anchored facts that drift-check catches deterministically*) and let them decide.
 
 3. **After either path, append this one-line command map:**
 

@@ -16,10 +16,16 @@ from pathlib import Path
 
 from _keep import Spec, find_specs
 
+try:
+    from coverage import summary as code_coverage_summary
+except ImportError:
+    code_coverage_summary = None  # coverage.py is optional — degrade gracefully
+
 
 def main():
     parser = argparse.ArgumentParser(description="KEEP status — repo-level dashboard")
     parser.add_argument("--knowledge", default="knowledge", help="Path to /knowledge/ root")
+    parser.add_argument("--repo", default=None, help="Repo root (default: parent of --knowledge)")
     args = parser.parse_args()
 
     knowledge = Path(args.knowledge).resolve()
@@ -53,14 +59,32 @@ def main():
     total_durable = len(specs) + len(adrs)
     coverage_pct = (specs_with_anchors / total_durable * 100) if total_durable else 0.0
 
+    # Code-level coverage (separate from spec-level coverage above)
+    code_cov_line = ""
+    code_pct: float = 0.0
+    code_total: int = 0
+    if code_coverage_summary is not None:
+        repo_root = Path(args.repo).resolve() if args.repo else knowledge.parent
+        try:
+            anchored, code_total, code_pct = code_coverage_summary(knowledge, repo_root)
+            code_cov_line = (
+                f"  code:      {anchored}/{code_total} top-level symbols anchored "
+                f"({code_pct:.0f}% coverage of supported source files)"
+            )
+        except Exception:
+            # Best-effort — coverage should never block the dashboard
+            pass
+
     print(f"KEEP status — {knowledge}")
     print(f"  specs:     {len(specs)}")
     print(f"  ADRs:      {len(adrs)}")
     print(f"  ideas:     {len(ideas)} ({len(drafts_aging)} in draft)")
     print(
         f"  anchors:   {total_anchors} across {specs_with_anchors}/{total_durable}"
-        f" durable files ({coverage_pct:.0f}% coverage)"
+        f" durable files ({coverage_pct:.0f}% of specs/ADRs are anchored)"
     )
+    if code_cov_line:
+        print(code_cov_line)
 
     # Surface hints based on state
     hints: list[str] = []
@@ -73,6 +97,12 @@ def main():
         hints.append(
             "anchor coverage is low — anchors make `/keep-check-drift` deterministic."
             " Add `anchors:` blocks to spec frontmatter (schema in references/file_formats.md)."
+        )
+    if code_total > 0 and code_pct < 25:
+        hints.append(
+            f"code-level anchor coverage is {code_pct:.0f}% — most top-level symbols "
+            "are not enforced by drift detection. Run `scripts/coverage.py` for a "
+            "per-file breakdown of unanchored symbols."
         )
     index_md = knowledge / "INDEX.md"
     if index_md.exists():

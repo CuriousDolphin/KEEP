@@ -189,15 +189,18 @@ def walk_knowledge(root: pathlib.Path) -> Iterable[KnowledgeFile]:
             yield kf
 
 
-def render_table(rows: list[tuple[str, ...]], headers: tuple[str, ...]) -> str:
-    """Render a markdown table from a list of row tuples."""
+def render_table(rows: list[tuple], headers: tuple[str, ...]) -> str:
+    """Render a markdown table from a list of row tuples.
+
+    Cells are coerced to str before escaping. YAML scalars sometimes come back
+    as datetime.date / int — coercing here keeps callers from having to remember.
+    """
     if not rows:
         return "_(none)_\n"
     out = ["| " + " | ".join(headers) + " |"]
     out.append("|" + "|".join(["---"] * len(headers)) + "|")
     for row in rows:
-        # Escape pipes in cells so they don't break the table
-        escaped = [c.replace("|", "\\|") for c in row]
+        escaped = [str(c).replace("|", "\\|") for c in row]
         out.append("| " + " | ".join(escaped) + " |")
     return "\n".join(out) + "\n"
 
@@ -207,9 +210,50 @@ def truncate(text: str, n: int = 120) -> str:
     return text if len(text) <= n else text[: n - 1] + "…"
 
 
+# Knowledge-link prefixes we follow into the reverse graph. `code:` and `test:`
+# point at the codebase, not at other knowledge files, so they don't appear
+# here — they're handled by check_drift, not by the index.
+_BACKLINK_PREFIXES = ("adr:", "spec:", "idea:", "runbook:")
+
+
+def _extract_backlinks(files: list[KnowledgeFile]) -> dict[str, list[str]]:
+    """Build the reverse-reference graph from `related:` blocks.
+
+    For every file F whose `related:` mentions another knowledge id T, record
+    F as a referrer of T. The result maps target_id -> [source_id, ...].
+
+    This powers Karpathy-style automatic backlinks: each file's index entry can
+    show "who points at me?" without anyone having to maintain the reverse side
+    by hand.
+    """
+    backlinks: dict[str, list[str]] = defaultdict(list)
+    for kf in files:
+        if kf.issues:
+            continue
+        related = kf.frontmatter.get("related", []) or []
+        if not isinstance(related, list):
+            continue
+        for ref in related:
+            if not isinstance(ref, str):
+                continue
+            for prefix in _BACKLINK_PREFIXES:
+                if ref.startswith(prefix):
+                    target = ref[len(prefix):].strip()
+                    # Strip trailing notes like "ADR-0007  # supersedes"
+                    target = target.split("#", 1)[0].strip()
+                    if target and kf.id not in backlinks[target]:
+                        backlinks[target].append(kf.id)
+                    break
+    # Sort each referrer list for stable output
+    for k in backlinks:
+        backlinks[k].sort()
+    return dict(backlinks)
+
+
 def build_index(root: pathlib.Path) -> tuple[str, list[KnowledgeFile]]:
     """Build the INDEX.md content and return it with the list of files."""
     files = list(walk_knowledge(root))
+    backlinks = _extract_backlinks(files)
 
     by_type: dict[str, list[KnowledgeFile]] = defaultdict(list)
     by_tag_runbook: list[KnowledgeFile] = []
@@ -346,6 +390,23 @@ def build_index(root: pathlib.Path) -> tuple[str, list[KnowledgeFile]]:
                 kf.relpath,
             ))
         out.append(render_table(rows, ("ID", "Title", "Domain", "Path")))
+        out.append("")
+
+    if backlinks:
+        out.append("## Backlinks")
+        out.append("")
+        out.append(
+            "_Reverse view of `related:` references. "
+            "Useful when answering *\"who depends on this decision?\"* without grepping. "
+            "Auto-derived; do not hand-edit._"
+        )
+        out.append("")
+        rows = []
+        # Sort by target id for stable output
+        for target_id in sorted(backlinks):
+            referrers = backlinks[target_id]
+            rows.append((target_id, str(len(referrers)), ", ".join(referrers)))
+        out.append(render_table(rows, ("Referenced ID", "# Referrers", "Referrers")))
         out.append("")
 
     if issues:

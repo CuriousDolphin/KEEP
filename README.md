@@ -135,8 +135,15 @@ skills/KEEP/              SKILL.md (source of truth) + references/ + scripts/
 
 Full specification: [SKILL.md](skills/KEEP/SKILL.md). The files in `commands/` exist so plugin-installed users get real slash commands with autocomplete; the skill body behaves the same when triggered via slash command or natural language.
 
-## Develop locally
+---
 
-```bash
-claude plugin validate .
-```
+## Inspiration
+
+KEEP wouldn't exist in this shape without two ideas it stands on the shoulders of:
+
+- **[Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** ([original tweet](https://x.com/karpathy/status/2040470801506541998)). The "personal wiki the LLM keeps up to date for you" pattern. KEEP is what happens when you take that idea and apply it specifically to a software repository — same compile-and-cross-link instinct, but tuned for *intent* (specs, ADRs, runbooks) rather than personal notes, and with an enforcement layer (drift checks against code anchors) that a personal wiki doesn't need.
+- **[Anchored Dev](https://anchored-dev.org/getting-started/)**. The discipline of anchoring specifications to specific places in the code, so the spec and the implementation can be mechanically checked for agreement. `/keep-check-drift` and the `anchors:` block in spec frontmatter are KEEP's expression of this: when a spec claims to govern a constant, function, or test, it has to *point at it* — and a rename or deletion deterministically breaks the build until the spec is updated too.
+
+The core insight from combining the two: a wiki the LLM keeps up to date is great, but a wiki the LLM keeps up to date *and that can fail CI when it lies* is what makes the knowledge layer reliable enough to trust long-term.
+
+---
