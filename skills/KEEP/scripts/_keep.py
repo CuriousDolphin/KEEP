@@ -1,4 +1,4 @@
-"""Shared utilities for KEEP v4 scripts (anchor / stub / check-drift).
+"""Shared utilities for KEEP scripts (anchor / stub / check-drift).
 
 Single source of truth for:
 - Spec frontmatter parsing (YAML)

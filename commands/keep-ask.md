@@ -3,37 +3,35 @@ description: Ask a question about the system — KEEP synthesizes an answer from
 argument-hint: <natural-language question>
 ---
 
-Use the `keep` skill in **ask mode**. Question: `$ARGUMENTS`.
+Question: `$ARGUMENTS`.
 
-Follow this contract (full detail in the skill's `/keep-ask` section):
+## Contract
 
-1. **Read `/knowledge/INDEX.md` first.** It is auto-generated from frontmatter and lets you filter by domain, tags, type without opening files.
-2. **Select 1-5 candidate files** that match the question, using `description`, `tags`, and `domain` fields. Prefer precision over recall — irrelevant context degrades reasoning.
-3. **Open the candidates and synthesize an answer.** Quote specific passages — do not paraphrase content you would otherwise cite.
-4. **Cite every load-bearing claim** with the file's `id` (e.g. `[SPEC-auth-jwt]`, `[ADR-0014]`). The id appears in the INDEX and at the top of the file's frontmatter.
-5. **If the knowledge layer does NOT cover the question, say so explicitly.** Do not fall back to generic knowledge presented as repo truth — that is the antipattern this command exists to prevent.
+1. **Read `/knowledge/INDEX.md` first** — auto-generated from frontmatter, lets you filter by domain/tags/type without opening files.
+2. **Select 1-5 candidate files** matching the question via `description`, `tags`, `domain`. Prefer precision over recall.
+3. **Open the candidates and synthesize**. Quote specific passages — don't paraphrase content you'd otherwise cite.
+4. **Cite every load-bearing claim** with the file's `id` (e.g. `[SPEC-auth-jwt]`, `[ADR-0014]`).
+5. **If `/knowledge/` doesn't cover the question, say so explicitly.** Don't fall back to generic knowledge presented as repo truth — that's the antipattern this command exists to prevent.
 
-**Hard rules**
+Output: a direct answer followed by a short *Sources* footer with cited ids and paths.
 
-- Read-only. No file writes.
-- The answer must be derived from `/knowledge/`. If you cite the code, mark it clearly as "from the code, not from the knowledge layer".
-- Follow `related:` links in frontmatter when they bear on the question — a spec may point to an ADR with the actual rationale, and you should include both.
-- Respect `status`: `superseded` entries are historical; `deprecated` are still informational but moving away. Never present them as the current state without flagging.
-- If `INDEX.md` is missing or empty, say so and suggest `scripts/init.sh` (first time) or `/keep-compile` (to start populating from a recent diff).
+## List mode (no synthesis)
 
-**Output shape**
-
-A direct answer to the question, followed by a short "Sources" footer listing the cited file ids and paths.
-
-**List mode (no synthesis)**
-
-When the user says something like *"just list the relevant files, don't synthesize"* or *"give me paths only"* — or when you (the implementing agent) only need to locate files before opening them yourself — skip steps 3-4 and return:
+When the user says *"just list paths"* / *"give me the relevant files, don't synthesize"*, or when you only need to locate files before opening them yourself, skip steps 3-4 and return:
 
 ```
 For "$ARGUMENTS":
-- [SPEC-auth-jwt] knowledge/docs/specs/auth/jwt.md  — JWT validation, issuer/audience checks, refresh flow
-- [ADR-0014]     knowledge/docs/decisions/ADR-0014-ray-serve.md  — Ray Serve adoption (supersedes ADR-0007)
-- [SPEC-auth-jwt-rotation] knowledge/docs/specs/auth/jwt-rotation.md  — runbook-tagged: secret rotation
+- [SPEC-auth-jwt]   knowledge/docs/specs/auth/jwt.md   — JWT validation, issuer/audience checks, refresh flow
+- [ADR-0014]        knowledge/docs/decisions/ADR-0014-ray-serve.md  — Ray Serve adoption (supersedes ADR-0007)
+- [SPEC-auth-jwt-rotation]  knowledge/docs/specs/auth/jwt-rotation.md  — runbook: secret rotation
 ```
 
-Same selection logic (frontmatter filter, max ~5 files), no synthesis. This replaces the v1 `/keep-retrieve` command — one read command, two output shapes.
+Same selection logic, no synthesis.
+
+## Hard rules
+
+- Read-only. No file writes.
+- Answer must derive from `/knowledge/`. If you cite the code, mark it as *"from the code, not from the knowledge layer"*.
+- Follow `related:` links when relevant — a spec may point to an ADR with the actual rationale; include both.
+- Respect `status`: `superseded` is historical, `deprecated` is informational-but-moving-away. Never present them as current state without flagging.
+- If `INDEX.md` is missing/empty, say so and suggest `/keep-init` (first time) or `/keep-compile` (to start populating).

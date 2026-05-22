@@ -1,7 +1,7 @@
 ---
 id: SPEC-000-keep
 title: "KEEP — knowledge-layer conventions"
-description: "How this repository uses KEEP: the /knowledge layout, mandatory YAML frontmatter, anchors and drift detection, ADR supersession, and the six slash commands. Read this before authoring or editing any knowledge file."
+description: "How this repository uses KEEP: the /knowledge layout, mandatory YAML frontmatter, anchors and drift detection, ADR supersession, and the seven slash commands. Read this before authoring or editing any knowledge file."
 status: accepted
 type: spec
 domain: keep
@@ -83,9 +83,9 @@ When ADR-MMMM replaces ADR-NNNN: new ADR has `status: accepted` and `related: [a
 
 When they conflict, drift detection surfaces the conflict; the team decides which one updates.
 
-## The six commands
+## The seven commands
 
-The KEEP skill exposes six slash commands. Their full contracts live in the skill's `commands/` directory; this is a one-liner index:
+The KEEP skill exposes seven slash commands. Their full contracts live in the skill's `commands/` directory; this is a one-liner index:
 
 - `/keep` — dashboard. If `/knowledge` exists, prints stats. If missing, suggests `/keep-init`.
 - `/keep-init` — bootstrap. Scaffolds `/knowledge`, writes this spec, appends KEEP snippet to AGENTS.md.

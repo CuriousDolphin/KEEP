@@ -1,22 +1,20 @@
 # File formats and templates
 
-Templates for every file type in `/knowledge`, plus three cross-cutting conventions: **mandatory YAML frontmatter**, **linking between files**, and **ADR supersession**.
+Three cross-cutting conventions — **frontmatter**, **anchors**, **linking + ADR supersession** — plus a body template per file type.
 
-Why the frontmatter is mandatory: it powers everything else. `/keep-ask` filters by `description`, `tags`, and `domain` before opening files. `/keep-check-drift` matches changed code to affected knowledge via `related` patterns. `INDEX.md` is regenerated from frontmatter by `scripts/build_index.py` — files without frontmatter end up in a "needs fixing" section and are invisible to retrieval. If you find yourself writing a knowledge file without frontmatter, you are creating an unverified artifact that will drift and lie. Don't.
+## 1. Mandatory YAML frontmatter
 
-## Cross-cutting convention 1 — Mandatory YAML frontmatter
-
-Every file under `/knowledge/docs/` and `/knowledge/ideas/` must start with this block:
+Every file under `/knowledge/docs/` and `/knowledge/ideas/` starts with this block:
 
 ```yaml
 ---
-id: SPEC-auth-jwt              # stable identifier — type-domain-slug, immutable once published
-title: "JWT validation"        # short human title
+id: SPEC-auth-jwt              # stable, immutable once published
+title: "JWT validation"
 description: "Behavioral spec for JWT issuer/audience validation, expiry handling, and the refresh flow on /auth/* endpoints. Covers TTL, signature rotation, error cases."
 status: accepted               # draft | accepted | deprecated | superseded
 type: spec                     # spec | adr | idea  (runbook/architecture are tags on specs)
 domain: auth                   # cohesive area; matches a top-level subdirectory under specs/
-tags: [auth, jwt, security]    # free-form, lowercase, hyphens. Use 'runbook' or 'architecture' as tag when relevant.
+tags: [auth, jwt, security]    # free-form, lowercase, hyphens. 'runbook' and 'architecture' are reserved.
 related:
   - adr:ADR-0014
   - test:internal/auth/*_test.go matching TestJWT*
@@ -24,41 +22,35 @@ related:
 ---
 ```
 
+Frontmatter powers retrieval (`/keep-ask` filters before opening files), drift detection (`anchors:`, see below), and INDEX regeneration (`scripts/build_index.py`). Files without it are unverified artifacts that drift and lie.
+
 ### Field semantics
 
-- **`id`** — stable, immutable once published. ADRs use `ADR-NNNN` (zero-padded). Specs use `SPEC-<domain>-<slug>`. Ideas use `IDEA-<YYYY-MM-DD>-<slug>`. The id is the canonical handle for cross-references and citation in `/keep-ask` answers.
-- **`title`** — short human-readable title. Used in tables and as the H1 of the body.
-- **`description`** — **the most load-bearing field.** Written as a *search snippet*, not a chapter heading. `/keep-ask` decides whether to load a file based on this string matching the user's question. Bad: `"Worker stuff"`. Good: `"Behavioral expectations for worker registration, heartbeat, job assignment, shutdown, and disconnection handling"`. Include the keywords a future reader would type.
-- **`status`** — `draft` (proposed, not validated), `accepted` (authoritative), `deprecated` (still in repo for context, but the team is moving away), `superseded` (replaced by a specific newer file; the supersession protocol below applies).
-- **`type`** — strict vocabulary. `spec` covers what the system should do (behavioral). `adr` covers a decision with rejected alternatives. `idea` covers half-formed proposals in `/knowledge/ideas/`. Runbooks and architecture docs are *specs with a tag*, not separate types — this is intentional, see below.
-- **`domain`** — must match a real area of the system. In a monorepo, this is the package name (`auth-service`, `inference-api`). In a single-package repo, a logical area (`auth`, `billing`). Used to scope `/keep-ask` and `/keep-check-drift`.
-- **`tags`** — free-form keywords. Two tags are *semantically reserved*: `runbook` marks a spec that documents failure modes/operational behavior; `architecture` marks a spec that describes topology. Use them so `INDEX.md` can group correctly.
-- **`related`** — convention-based cross-references. Prefixes are mandatory: `adr:`, `spec:`, `test:`, `code:`, `runbook:` (a tag-runbook spec), `idea:`. For code/test references, use *path patterns or naming patterns*, never hard-coded line numbers — those break the moment a file is renamed. See the example: `test:internal/auth/*_test.go matching TestJWT*` is a pattern, not a list.
+- **`id`** — immutable canonical handle. ADRs: `ADR-NNNN` zero-padded. Specs: `SPEC-<domain>-<slug>`. Ideas: `IDEA-<YYYY-MM-DD>-<slug>`.
+- **`title`** — short human title; used in tables and as H1.
+- **`description`** — **the most load-bearing field.** It's a *search snippet*, not a chapter heading. `/keep-ask` decides whether to load a file by matching this against the user's question. Bad: *"Worker stuff"*. Good: *"Behavioral expectations for worker registration, heartbeat, job assignment, shutdown, and disconnection handling"*. Include keywords a future reader would type.
+- **`status`** — `draft` (proposed, not validated), `accepted` (authoritative), `deprecated` (kept for context, team moving away), `superseded` (replaced by a specific newer file; see supersession protocol).
+- **`type`** — `spec` | `adr` | `idea`. Strict vocabulary. Runbooks and architecture are tags on specs, not separate types — both are behavioral descriptions consulted the same way; splitting them would just force a routing decision on every write.
+- **`domain`** — real area of the system. Monorepo: the package name (`auth-service`). Single-package: a logical area (`auth`, `billing`). Used to scope `/keep-ask` and `/keep-check-drift`.
+- **`tags`** — free-form keywords. Two reserved: `runbook` (failure modes / operational), `architecture` (topology). INDEX groups by these.
+- **`related`** — convention-based cross-references. Prefixes are mandatory: `adr:`, `spec:`, `test:`, `code:`, `runbook:`, `idea:`. For code/test, use *patterns* not hard-coded line numbers — patterns survive renames. Example: `test:internal/auth/*_test.go matching TestJWT*`.
 
-### Why no separate `runbook` and `architecture` types
+## 2. Anchors — enforceable claims
 
-KEEP v1 had four types: spec, adr, runbook, architecture. The first three months of usage showed they were the same artifact wearing different hats — all behavioral descriptions, all consulted the same way, all under the same retrieval logic. Forcing four directories created a routing decision on every write ("is this a runbook or a spec?") with no real downstream benefit.
+`related:` says which files are *plausibly* affected. **Anchors** say which *values* must hold — structured claims that `scripts/check_drift.py` verifies deterministically. They live in the same frontmatter, under `anchors:`.
 
-The v2 collapse: `spec` is the artifact type; `runbook` and `architecture` are tags that change which sections the template emphasizes. The retrieval pipeline doesn't care; the human reading the spec sees a Symptoms/Causes section because the spec carries the `runbook` tag. Less vocabulary, same expressiveness.
-
-If you want a runbook-style file: `type: spec`, `tags: [runbook, ...]`, body follows the runbook template below. Same for architecture. `INDEX.md` auto-generates dedicated sections for both based on the tags.
-
-## Cross-cutting convention 2 — Anchors (enforceable claims)
-
-`related:` patterns are loose — they tell you which files are *plausibly* affected but not which *values* must hold. **Anchors** are the strict counterpart: structured claims that `scripts/check_drift.py` verifies deterministically against source code. They live in the same frontmatter, under the `anchors:` key.
-
-Anchors are **opt-in per spec.** A spec without anchors is still valid; it just sits outside the drift gate. Add anchors only for facts that matter — typically 3-7 per spec, not 30.
+Anchors are opt-in per spec. A spec without anchors is valid, just outside the drift gate. Add 3-7 anchors for facts that matter, not 30.
 
 ### Schema
 
 ```yaml
 anchors:
-  - id: ttl                                    # short slug, used in the marker key for /keep-check-drift
-    claim: "Tokens expire after 5 minutes idle"   # human-readable description (verbatim from spec body)
+  - id: ttl
+    claim: "Tokens expire after 5 minutes idle"
     kind: const                                  # const | function | test | manual
-    file: services/auth/jwt.go                   # path relative to repo root
-    symbol: TOKEN_TTL                            # identifier in the code
-    value: "5 * time.Minute"                     # required for kind=const; whitespace is normalized
+    file: services/auth/jwt.go
+    symbol: TOKEN_TTL
+    value: "5 * time.Minute"                     # required for kind=const
 
   - id: new_token_sig
     claim: "NewToken takes audience, returns (token, error)"
@@ -71,49 +63,44 @@ anchors:
     claim: "Grace window allows both pre- and post-rotation secrets"
     kind: test
     file: services/auth/jwt_test.go
-    symbol: TestGraceWindow_AcceptsBothSecrets   # test function (Go/Python) or test name string (TS jest/vitest)
+    symbol: TestGraceWindow_AcceptsBothSecrets
 
   - id: prod_cronjob
     claim: "Production rotates JWT secrets every 90 days via cronjob"
     kind: manual
-    file: infra/k8s/secrets/cronjob.yaml          # not a checkable language — reported as manual
+    file: infra/k8s/secrets/cronjob.yaml          # not a checkable language
     notes: "Verified out-of-band via terraform state"
 ```
 
-### Anchor kinds
+### Kinds
 
-| `kind`     | Required fields                | What `/keep-check-drift` verifies                                                     |
-|------------|--------------------------------|----------------------------------------------------------------------------------------|
-| `const`    | `file`, `symbol`, `value`       | A top-level `const`/`var`/assignment of `symbol` exists with the given `value`. Whitespace is normalized; commented declarations are ignored. |
-| `function` | `file`, `symbol`, `signature`   | A function `symbol` is declared with the given parameters and return type. Multiline declarations and trailing commas are normalized. |
-| `test`     | `file`, `symbol`                | A test exists for `symbol` AND is not skipped (`t.Skip`, `@pytest.mark.skip`, `pytest.skip(...)`, `test.skip(...)`, `xtest`, `xit` all count as skipped). |
-| `manual`   | `file`                          | Nothing. Reported in the dashboard as a known external dependency; never causes failure. |
+| kind | Required fields | What check_drift verifies |
+|---|---|---|
+| `const` | `file`, `symbol`, `value` | Top-level `const`/`var`/assignment of `symbol` exists with the given value (whitespace-normalized; commented declarations ignored). |
+| `function` | `file`, `symbol`, `signature` | Function `symbol` declared with the given parameters and return type. Multiline and trailing commas normalized. |
+| `test` | `file`, `symbol` | Test exists AND is not skipped (`t.Skip`, `@pytest.mark.skip`, `pytest.skip(...)`, `test.skip(...)`, `xtest`, `xit` all count as skipped). |
+| `manual` | `file` | Nothing. Reported as known external dependency; never causes failure. |
 
-### Languages supported
+Languages supported: Go (`.go`), Python (`.py`), TypeScript (`.ts`/`.tsx`). Other extensions surface as `missing` — either point at a checkable file or use `kind: manual`.
 
-Go (`.go`), Python (`.py`), TypeScript (`.ts`/`.tsx`). Other extensions surface as `missing` — anchor declared but not verifiable. Either change the binding to point at a checkable file, or use `kind: manual` and explain in `notes`.
+### Failure modes during check-drift
 
-### Drift vs validation
-
-Two failure modes during `/keep-check-drift`:
-
-- **drift** — symbol found, but value/signature doesn't match the anchor. The user must reconcile (update the spec OR fix the code).
-- **missing** — target file or symbol absent. The user must restore the binding OR remove the anchor.
-
-A spec with an invalid anchor block (missing `value` on a `kind: const`, unknown `kind`, etc.) surfaces a `_validation` error during check-drift — fix the frontmatter before drift detection can run on that spec.
+- **drift** — symbol found, value/signature doesn't match. User reconciles (update spec OR fix code).
+- **missing** — target file or symbol absent. User restores binding OR removes anchor.
+- **_validation** — invalid anchor block (missing `value` on `kind: const`, unknown `kind`, etc.). Fix the frontmatter before drift can run.
 
 ### How anchors get created
 
-Two paths:
+1. **By `/keep-compile`** when writing a new spec from a diff: concrete values in the diff (literals on constants, function signatures, test names) become candidate anchors. The user accepts or rejects each. This is the default path.
+2. **Hand-written** during authoring, for facts the user wants enforced.
 
-1. **Hand-written** during spec authoring or `/keep-compile`. The agent or user identifies the load-bearing claims and writes the block.
-2. **Suggested by `/keep-compile`** when it writes a new spec from a diff: concrete values in the diff (literals assigned to constants, function signatures, test names) become candidate anchors. The user accepts or rejects each.
+Anchors are never created speculatively. Claims the diff doesn't explicitly establish become `<!-- TODO(KEEP) -->` markers in the body, not phantom anchors.
 
-Anchors are NOT created speculatively. A claim that the diff doesn't explicitly establish (rejected alternatives, edge cases, root cause) becomes a `<!-- TODO(KEEP) -->` marker in the body, not a phantom anchor.
+## 3. Linking and ADR supersession
 
-## Cross-cutting convention 3 — Linking between files
+### Linking
 
-The `related:` block in the frontmatter is the *machine-readable* cross-reference. For prose, you can also add a `## Related` section at the bottom of the body with relative markdown links:
+`related:` is the machine-readable side. For prose, optionally add `## Related` at the bottom:
 
 ```md
 ## Related
@@ -122,60 +109,48 @@ The `related:` block in the frontmatter is the *machine-readable* cross-referenc
 - Operationalized by: [specs/auth/jwt-rotation.md](./jwt-rotation.md)
 ```
 
-Use **relative paths** from the file's location. The relationship verb (`Implements`, `Supersedes`, `Operationalized by`, `Depends on`, `See also`, `Refines`) is free-form but should be informative.
+Use relative paths. Relationship verbs (`Implements`, `Supersedes`, `Operationalized by`, `Depends on`, `See also`, `Refines`) are free-form but should be informative. When `/keep-compile` updates a file, it updates the other side of the link too (if spec A now implements ADR B, both files reference each other).
 
-When `/keep-compile` updates a file, it should update the `## Related` section and the *other side* of the link (if spec A now implements ADR B, both files should reference each other).
+### ADR supersession protocol
 
-## Cross-cutting convention 3 — ADR supersession
+When ADR-MMMM supersedes ADR-NNNN:
 
-Decisions get revisited. The supersession protocol below preserves history while making the current state of the world unambiguous.
-
-### When ADR-MMMM supersedes ADR-NNNN
-
-1. **Create the new ADR (MMMM) normally** with `status: accepted`. In `related:`, add `adr:ADR-NNNN` with a `supersedes` note. In the **Context** section, explain *what changed* that made the old decision obsolete.
-
-2. **Update the old ADR (NNNN) in place.** Two changes only:
-   - Set `status: superseded` in the frontmatter.
-   - Append a `## Superseded by` section at the end with a one-line "what changed" summary and a link to ADR-MMMM.
-   - **Never edit the body of a superseded ADR.** It is a historical record.
-
-3. **INDEX.md regenerates automatically.** `scripts/build_index.py` moves superseded ADRs into a dedicated section based on their status. You do not edit the index manually.
+1. **New ADR (MMMM)** with `status: accepted`. In `related:` add `adr:ADR-NNNN` with a `supersedes` note. In `## Context`, explain what changed.
+2. **Old ADR (NNNN)** updated in place — *two changes only*: `status: superseded` in frontmatter, and a `## Superseded by` section at the end with a one-line summary and link to MMMM. **Never edit the body of a superseded ADR** — it's a historical record.
+3. **INDEX.md** regenerates automatically; superseded entries move to a dedicated section.
 
 ### Partial supersession (refinement)
 
-When a new ADR doesn't fully replace an old one — it modifies a specific aspect — use `Refines:` in the prose `## Related` section and keep the old ADR's status as `accepted`. The old ADR adds a `## Refined by` section pointing to the newer file. Confusing refinement with supersession loses valid context.
+When a new ADR doesn't fully replace an old one but modifies a specific aspect, use `Refines:` in `## Related` and keep the old ADR's status `accepted`. The old ADR adds a `## Refined by` section pointing to the newer file. Don't conflate refinement with supersession — it loses context.
 
 ### Translating user statements about status
 
-| User says... | Status |
+| User says | Status |
 |---|---|
 | "still accepted" / "still current" | `accepted` |
-| "this has been replaced" / "we don't do this anymore" | `superseded` (with full supersession protocol) |
+| "this has been replaced" / "we don't do this anymore" | `superseded` (full supersession protocol) |
 | "partially superseded" / "we updated part of this" | `accepted` + `Refines:` link from the newer ADR |
 | "deprecated" / "we're moving away from this" | `deprecated` |
 | "we never really followed this" / "this was aspirational" | `deprecated` |
 
-If the user names the successor decision, capture it. If they don't, do not fabricate — leave a `<!-- TODO(KEEP): successor decision not identified -->` marker and let `/keep-govern` surface it later.
+If the user names the successor, capture it. If they don't, don't fabricate — leave `<!-- TODO(KEEP): successor decision not identified -->`.
 
 ---
 
-## Specs — `/knowledge/docs/specs/<domain>/<feature>.md`
+## Body templates
 
-Specs describe *intended behavior*, not implementation. They evolve as the system evolves.
+### Spec (behavioral)
 
 ```md
 ---
 id: SPEC-auth-jwt
 title: "JWT validation"
-description: "Behavioral expectations for JWT validation: issuer/audience checks, expiry, secret rotation."
+description: "..."
 status: accepted
 type: spec
 domain: auth
 tags: [auth, jwt, security]
-related:
-  - adr:ADR-0014
-  - test:internal/auth/*_test.go matching TestJWT*
-  - code:internal/auth/jwt.go
+related: [adr:ADR-0014, test:internal/auth/*_test.go matching TestJWT*, code:internal/auth/jwt.go]
 ---
 
 # JWT validation
@@ -185,36 +160,21 @@ related:
 
 ## Requirements
 - <requirement>
-- <requirement>
 
 ## Edge cases
-- <case>
 - <case>
 
 ## Acceptance criteria
 - <verifiable criterion>
-- <verifiable criterion>
 ```
 
-Keep specs minimal. If a section is empty, omit it.
+Omit empty sections.
 
-### Spec with `runbook` tag (operational knowledge)
+### Spec with `runbook` tag (operational)
 
-A spec tagged `runbook` describes failure modes and operational response, not desired behavior. The body uses these sections instead:
+Describes failure modes and operational response. Same frontmatter shape; body uses different sections:
 
 ```md
----
-id: SPEC-auth-jwt-rotation
-title: "JWT secret rotation"
-description: "Failure mode and operational runbook for JWT secret rotation: 401 spike symptoms, dual-secret mitigation, prevention strategy."
-status: accepted
-type: spec
-domain: auth
-tags: [auth, runbook, jwt]
-related:
-  - spec:SPEC-auth-jwt
----
-
 # JWT secret rotation
 
 ## Symptoms
@@ -234,21 +194,7 @@ Only write a runbook for a failure that has actually happened or is genuinely li
 
 ### Spec with `architecture` tag (topology / boundaries)
 
-A spec tagged `architecture` describes topology, components, boundaries. The body uses these sections:
-
 ```md
----
-id: SPEC-auth-architecture
-title: "Auth service architecture"
-description: "Topology and boundaries of the auth service: components, data flow, dependencies on Postgres, what is intentionally outside."
-status: accepted
-type: spec
-domain: auth
-tags: [auth, architecture]
-related:
-  - adr:ADR-0001
----
-
 # Auth service architecture
 
 ## Components
@@ -273,23 +219,18 @@ Frontend → API Gateway → Auth Service → Postgres
                          JWT (HS256)
 ```
 
-## ADRs — `/knowledge/docs/decisions/ADR-NNNN-<slug>.md`
-
-Architecture Decision Records capture *why* a non-trivial choice was made and what alternatives were rejected.
+### ADR
 
 ```md
 ---
 id: ADR-0014
 title: "Ray Serve for ML inference"
-description: "Adopted Ray Serve for the inference layer. KServe was rejected due to CRD complexity. Custom FastAPI was rejected as undifferentiated reinvention of autoscaling and batching."
+description: "Adopted Ray Serve. KServe rejected (CRD complexity). Custom FastAPI rejected (undifferentiated reinvention)."
 status: accepted
 type: adr
 domain: inference
 tags: [inference, infrastructure, ml]
-related:
-  - adr:ADR-0007  # supersedes
-  - spec:SPEC-inference-pipeline
-  - code:services/inference/server.go
+related: [adr:ADR-0007, spec:SPEC-inference-pipeline, code:services/inference/server.go]
 ---
 
 # ADR-0014: Ray Serve for ML inference
@@ -312,29 +253,23 @@ Accepted
 
 ## Consequences
 - <tradeoff>
-- <tradeoff>
 
 ## Drivers
-<the positive factors that made this option specifically right, distinct from rejected-alternatives reasoning>
-- <factor>
+<positive factors that made this option win on its own merits — distinct from rejected-alternatives reasoning>
 - <factor>
 ```
 
-### ADR numbering
+**ADR numbering**: sequential, never reused. Before assigning a number, list `decisions/` and use the next available integer — never pre-number from memory or the conversation flow.
 
-Sequential and never reused. **Before assigning a number, list the existing `decisions/` directory** and use the next available integer — never pre-number from memory or from the conversation flow.
+**The three rationale sections** answer different questions and shouldn't be merged:
 
-### The three rationale sections
+- **Alternatives considered** — *"why didn't we pick X?"* — one entry per rejected option.
+- **Consequences** — *"what cost are we accepting?"* — tradeoffs, downsides, future obligations.
+- **Drivers** — *"why this option specifically?"* — positive factors.
 
-- **Alternatives considered** answers *"why didn't we pick X?"* — one entry per rejected option with its specific rejection reason.
-- **Consequences** answers *"what cost are we accepting by picking this?"* — tradeoffs, downsides, future obligations.
-- **Drivers** answers *"why this option specifically?"* — the positive factors that made it win on its own merits.
+The separation is what makes ADRs useful in a year when someone asks *"what were we thinking?"*.
 
-Don't merge these into one section. The separation is what makes ADRs useful in a year when someone asks "what were we thinking?".
-
-## Ideas — `/knowledge/ideas/<slug>.md`
-
-Half-formed proposals not yet ready for ADR or spec. Captured durably so they don't disappear in chat history.
+### Idea
 
 ```md
 ---
@@ -345,8 +280,7 @@ status: draft
 type: idea
 domain: auth
 tags: [auth, jwt, rotation, brainstorm]
-related:
-  - runbook:SPEC-auth-jwt-rotation
+related: [runbook:SPEC-auth-jwt-rotation]
 created: 2026-05-13
 ---
 
@@ -360,33 +294,14 @@ created: 2026-05-13
 
 ## Open questions
 - <question to resolve before promoting>
-- <question to resolve before promoting>
 ```
 
-Status flow: `draft` → either promoted into a spec/ADR (via `/keep-compile`) or marked `deprecated` if dropped. `/keep-govern` flags ideas older than 30 days that haven't moved.
+Status flow: `draft` → promoted via `/keep-compile` (status becomes `deprecated`, `related:` points to the resulting spec/ADR) OR dropped (status: `deprecated` with a one-line note). `/keep-govern` flags ideas older than 30 days still in `draft`.
 
-## INDEX.md — auto-generated, not hand-maintained
+---
 
-`INDEX.md` is regenerated from frontmatter by `scripts/build_index.py`. It is the entry point for `/keep-ask` — the command reads it first to decide which files to open.
+## INDEX.md — auto-generated
 
-**Do not edit `INDEX.md` by hand.** The script:
+`scripts/build_index.py` walks `/knowledge/docs/` and `/knowledge/ideas/`, parses frontmatter, emits a deterministic table-based INDEX with one section per `type`, dedicated sections for `runbook`/`architecture` tags, a `Backlinks` section (reverse map of `related:`), a superseded section, and a "frontmatter issues" section for files missing required fields. `/keep-compile` calls the script as its last step.
 
-1. Walks `/knowledge/docs/` and `/knowledge/ideas/`.
-2. Parses YAML frontmatter from each file.
-3. Validates required fields (`id`, `title`, `description`, `status`, `type`, `domain`, `tags`).
-4. Renders one table per `type`, sorted by domain then id.
-5. Aggregates `runbook` and `architecture` tags into their own sections.
-6. Moves `superseded` entries into a dedicated section at the bottom.
-7. Flags files with invalid/missing frontmatter into an "issues" section.
-
-`/keep-compile` calls the script as its last step. You should never write to `INDEX.md` directly — if the schema produces a layout you don't like, fix the script, not the output.
-
-### What you get out
-
-A single, deterministic, table-based index that:
-
-- Lets the agent decide which files to load by reading 200 tokens (the table) instead of every spec body.
-- Makes "all files tagged X" or "all files in domain Y" trivial filters.
-- Surfaces frontmatter issues as a visible warning instead of silent index corruption.
-- Eliminates the v1 "Entities" / "Flows" sections that conflated semantically distinct things.
-
+Never hand-edit INDEX.md — if the layout is wrong, fix the script. Hand-editing reintroduces the drift this system exists to prevent.

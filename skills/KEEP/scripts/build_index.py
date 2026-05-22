@@ -4,12 +4,13 @@ build_index.py — regenerate /knowledge/INDEX.md from YAML frontmatter.
 
 Why this script exists
 ----------------------
-KEEP v1 had the agent hand-maintain INDEX.md. In practice that produced messy
-indexes where endpoint features ended up under "Entities" and similar
-cross-contamination. v2 makes INDEX.md a derived artifact: the source of truth
-is the YAML frontmatter at the top of each knowledge file. This script walks
-/knowledge/docs/, parses the frontmatter, and emits a deterministic INDEX.md
-grouped by type (specs, ADRs, runbooks-as-tag, architecture-as-tag).
+INDEX.md is a derived artifact: the source of truth is the YAML frontmatter
+at the top of each knowledge file. Hand-maintaining the index produces messy
+results (endpoint features under "Entities", runbook content under "Specs",
+etc.). This script walks /knowledge/docs/ and /knowledge/ideas/, parses the
+frontmatter, and emits a deterministic INDEX.md grouped by type (specs, ADRs,
+runbooks-as-tag, architecture-as-tag) plus an auto-generated Backlinks section
+derived from each file's `related:` block.
 
 Run:
     python -m scripts.build_index <path-to-knowledge-root>

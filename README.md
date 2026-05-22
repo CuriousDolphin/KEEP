@@ -4,7 +4,7 @@
 
 A memory layer for agentic, spec-driven software development.
 
-Code evolves; the reasoning behind it usually doesn't get written down. KEEP keeps a small, structured `/knowledge` directory next to the code — specs, ADRs, tagged operational and architecture notes, and an ideas inbox — and exposes **six** commands the agent uses to consult and maintain it as the codebase changes.
+Code evolves; the reasoning behind it usually doesn't get written down. KEEP keeps a small, structured `/knowledge` directory next to the code — specs, ADRs, tagged operational and architecture notes, and an ideas inbox — and exposes seven slash commands the agent uses to consult and maintain it as the codebase changes. Spec claims are bound to specific code symbols via `anchors:`; a deterministic drift check fails CI when reality diverges from the spec.
 
 ```
 /knowledge
@@ -20,7 +20,7 @@ Runbooks and architecture live as **specs with reserved tags**, not separate top
 
 ## Install
 
-**Claude Code plugin** — adds the skill plus **six** real slash commands with autocomplete:
+**Claude Code plugin** — adds the skill plus seven real slash commands with autocomplete:
 
 ```text
 /plugin marketplace add CuriousDolphin/KEEP
@@ -37,42 +37,55 @@ Both paths run the same logic — the skill itself is the source of truth. The p
 
 ## Commands
 
-Six slash commands (one root + five action verbs), plus a one-time bootstrap script.
+Seven slash commands. One root, one bootstrap, five action verbs.
 
 | Step | Surface | Purpose | Writes? |
 |---|---|---|---|
-| Entry point | `/keep` | Dashboard. If `/knowledge` missing, offers to run `scripts/init.sh`. Otherwise prints counts + anchor coverage + hints. | No |
-| Adoption (one-time) | `bash skills/KEEP/scripts/init.sh` (or via `/keep` on first run) | Scaffold `/knowledge`, scan pre-existing docs, append KEEP snippet to `AGENTS.md` / `CLAUDE.md` / `.cursorrules`. | Scaffold only |
-| Read | `/keep-ask <question>` | Synthesize an answer from `/knowledge` with `[id]` citations. Say *"just list paths"* for list-only output (no synthesis) when you'll open the files yourself. | No |
-| Write | `/keep-compile [source] [--dry]` | Two phases in one command — classify a diff/source, then apply updates and regenerate `INDEX.md` via `scripts/build_index.py`. `--dry` stops after classification. Suggests `anchors:` candidates when writing new specs. | Yes (unless `--dry`) |
+| Entry point | `/keep` | Dashboard. If `/knowledge` is missing, points the user to `/keep-init`. Otherwise prints counts + anchor coverage (spec-level and code-level) + adaptive hints. | No |
+| Bootstrap | `/keep-init` | Scaffold `/knowledge`, install `SPEC-000-keep.md` (self-spec), append KEEP snippet to `AGENTS.md` / `CLAUDE.md` / `.cursorrules`. Always asks consent before writing. | Scaffold only |
+| Read | `/keep-ask <question>` | Synthesize an answer from `/knowledge` with `[id]` citations. Say *"just list paths"* for list-only output. | No |
+| Write | `/keep-compile [source] [--dry]` | One command, two phases — classify a source, write/update specs+ADRs, propose anchors from concrete values, regenerate `INDEX.md`. `--dry` stops after classification. When the source is pre-existing markdown (not a git diff), the agent asks before writing. | Yes (unless `--dry`) |
 | Enforce | `/keep-check-drift [source]` | **Deterministic** — `scripts/check_drift.py` verifies every anchor in spec frontmatter against current code (Go, Python, TypeScript). Exit 1 blocks merge. CI / pre-commit ready. | No |
-| Hygiene | `/keep-govern` | Stale, duplicated, or contradicting knowledge; oversize files; `TODO(KEEP)` markers; draft ideas aging. Run weekly. | No |
-| Capture | `/keep-idea <description>` | Capture a parked thought under `ideas/` with `type: idea`, `status: draft`. | Yes |
+| Capture | `/keep-idea <description>` | Capture a parked thought under `ideas/` with `type: idea`, `status: draft`. Searches for prior art first. | Yes |
+| Hygiene | `/keep-govern` | Stale, duplicated, or contradicting knowledge; oversize files; `TODO(KEEP)` markers; aging draft ideas. Run weekly at most. | No |
 
 **Typical flows**
 
-- **Questions** (`how`, `why`, `where`, `is it safe`): `/keep-ask` first — not ad-hoc grep from memory. If you only need paths (because you'll open the files yourself), tell `/keep-ask` "just list paths".
-- **After meaningful code changes**: `/keep-compile` (single command, observe + write + regen). Add `--dry` if you want to preview without writing.
-- **Before merge**: `/keep-check-drift` on the diff.
+- **Questions** (`how`, `why`, `where`, `is it safe`): `/keep-ask` first — not ad-hoc grep. If you only need paths, tell `/keep-ask` "just list paths".
+- **First-time adoption**: `/keep-init`. The agent asks consent, scaffolds `/knowledge`, installs `SPEC-000-keep.md`, appends the AGENTS.md snippet.
+- **Pre-existing docs**: `/keep-compile ./docs/` (folder) or `/keep-compile docs/auth/jwt.md` (file). The agent asks: cordon (safe default) or migrate-with-verification.
+- **After meaningful code changes**: `/keep-compile` (single command, classify + propose anchors + write + regen). Add `--dry` to preview.
+- **Before merge**: `/keep-check-drift`. Exit 1 blocks merge.
 - **Parked ideas** (not implementing now): `/keep-idea "..."`.
 - **Hygiene**: `/keep-govern` occasionally (weekly at most).
 
-First-time adoption: `bash skills/KEEP/scripts/init.sh` then `/keep-compile ./docs/` for accepted ingestion candidates.
-
 ## Examples
 
-**First-time adoption on an existing repo**
+**First-time adoption**
 
 ```text
-$ bash skills/KEEP/scripts/init.sh
-Scaffolds /knowledge/. Detects monorepo layout. Scans docs/, ARCHITECTURE.md,
-notes/. Lists ingestion candidates. Appends KEEP workflow to AGENTS.md.
-Nothing migrated until /keep-compile.
+> /keep-init
+Asks: "Scaffold /knowledge, install SPEC-000-keep, append AGENTS.md snippet? [y/N]"
+On y → creates /knowledge/{docs/{specs,decisions},ideas}, INDEX.md,
+       /knowledge/docs/specs/keep/SPEC-000-keep.md, appends AGENTS.md.
+       Mentions optional CI/pre-commit setup, does not auto-install.
+```
 
+**Handling pre-existing docs**
+
+```text
 > /keep-compile ./docs/
-Phase 1 (observe): proposes per-file target type (spec / ADR / runbook-tagged / architecture-tagged / idea / split).
-Phase 2 (compile): migrates each accepted candidate with per-file approval. Adds provenance comments.
-Regenerates INDEX.md from YAML frontmatter.
+"./docs/ has 12 markdown files. Two options:
+  (a) Cordon the folder — one ADR declares it out of scope.        ← default
+  (b) Walk file-by-file — ask per file: migrate, cordon, or skip.
+Which do you want?"
+
+> /keep-compile docs/auth/jwt.md
+"Two options:
+  (a) Migrate — extract claims, verify each against current code,
+                ask about disagreements, write a clean spec with anchors.
+  (b) Cordon — mark as legacy / out of scope.                       ← default
+Which do you want?"
 ```
 
 **During normal work**
@@ -87,50 +100,62 @@ Same filter logic, returns ids + paths + one-line descriptions (no synthesis).
 [implement JWT refresh]
 
 > /keep-compile --dry
-Phase 1 only: classifies the diff (Feature + Decision). Surfaces nearby README as candidate. No writes.
+Phase 1 only: classifies the diff, detects any renames, lists suggested updates. No writes.
 
 > /keep-compile
-Both phases: classify + write spec/ADR with valid frontmatter + rebuild INDEX.md.
+Both phases: classify + write spec/ADR with valid frontmatter + propose anchors
+            from concrete values in the diff + regen INDEX.md (Backlinks section refreshed).
 ```
 
 **Before merge**
 
 ```text
 > /keep-check-drift
-Linter-style report on behavioral / decisional / operational drift vs related: patterns.
-Exit code 1 if merge should wait on knowledge updates.
+Deterministic anchor verification. Exit code 1 blocks merge if any anchor
+fails to bind to its current code symbol/value/signature.
 ```
 
 **Park an idea**
 
 ```text
 > /keep-idea "explore edge-signed tokens for service-to-service; not this quarter"
-Writes ideas/YYYY-MM-DD-slug.md in draft; promotion happens later via compile with approval.
+Searches /knowledge for prior art, then writes ideas/YYYY-MM-DD-slug.md in draft.
+Promotion to spec/ADR happens later via /keep-compile with explicit approval.
 ```
 
 **Periodic hygiene**
 
 ```text
 > /keep-govern
-Surfaces contradicting ADRs, oversize specs, old draft ideas, TODO(KEEP) markers. Suggestions only.
+Surfaces contradicting ADRs, oversize specs, aging draft ideas, TODO(KEEP) markers.
+Suggestions only — never writes without approval.
 ```
 
 ## Design principles
 
 - **Memory, not narration.** Capture rationale, edge cases, rejected alternatives. Skip implementation walkthroughs that just re-narrate the code.
-- **Brownfield-first.** Grow from real changes or ingestion of existing docs. No retroactive backfill of the whole codebase.
+- **Brownfield-first.** Grow from real code changes. For pre-existing docs the agent asks, then either cordons (safe default) or migrates per file with a verify-against-code pass — no silent imports.
 - **YAML frontmatter on every durable file** under `docs/` and `ideas/` so `/keep-ask`, the index, and `/keep-check-drift` can consume and enforce links. See [references/file_formats.md](skills/KEEP/references/file_formats.md).
-- **INDEX.md is derived** — regenerated from frontmatter by `skills/KEEP/scripts/build_index.py`. Hand-editing it reintroduces drift.
-- **Ask before inventing.** When `/keep-compile` would write a high-stakes field the diff cannot establish, it asks in batch mode instead of guessing.
+- **INDEX.md is derived** — regenerated from frontmatter (including the auto-built Backlinks section) by `skills/KEEP/scripts/build_index.py`. Hand-editing it reintroduces drift.
+- **Ask before inventing.** When `/keep-compile` would write a high-stakes field the diff cannot establish, it asks in batch mode (structured multiple-choice with a default) instead of guessing.
 - **Minimal diffs.** Updates preserve human-written rationale verbatim. Never rewrite whole files.
+- **Self-spec'd.** `/keep-init` installs `SPEC-000-keep.md` inside the knowledge layer so KEEP's conventions are documented *in* the repo, not just *about* it.
 
 ## Repository layout
 
 ```
-.claude-plugin/           plugin and marketplace manifest
-commands/                 thin slash-command wrappers (six commands: /keep + five action verbs; bootstrap is scripts/init.sh)
-skills/KEEP/              SKILL.md (source of truth) + references/ + scripts/
-  scripts/build_index.py  regenerates /knowledge/INDEX.md from frontmatter
+.claude-plugin/                manifest
+commands/                      slash-command wrappers (/keep, /keep-init, /keep-ask, /keep-compile,
+                                /keep-check-drift, /keep-idea, /keep-govern)
+skills/KEEP/
+  SKILL.md                     source of truth
+  references/                  file_formats, brownfield, monorepo, setup, templates/SPEC-000-keep.md
+  scripts/
+    init.sh                    one-time bootstrap (called by /keep-init)
+    status.py                  /keep dashboard probe
+    build_index.py             regenerates /knowledge/INDEX.md from frontmatter + backlinks
+    check_drift.py             deterministic anchor verification (CI/pre-commit ready)
+    coverage.py                code-level anchor coverage report
 ```
 
 Full specification: [SKILL.md](skills/KEEP/SKILL.md). The files in `commands/` exist so plugin-installed users get real slash commands with autocomplete; the skill body behaves the same when triggered via slash command or natural language.

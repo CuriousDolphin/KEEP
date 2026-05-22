@@ -1,5 +1,5 @@
 {
   "name": "keep",
-  "description": "KEEP — Knowledge Engine for Engineering Persistence. Agent skill for a living /knowledge layer (specs, ADRs, ideas; runbook & architecture as tags) with anchored facts for deterministic drift detection. Six slash commands: /keep (dashboard / bootstrap), /keep-ask, /keep-compile (--dry to preview), /keep-check-drift (deterministic, CI-friendly), /keep-govern, /keep-idea.",
+  "description": "KEEP — Knowledge Engine for Engineering Persistence. Agent skill for a living /knowledge layer (specs, ADRs, ideas; runbook & architecture as tags) with anchored facts for deterministic drift detection. Seven slash commands: /keep (dashboard), /keep-init (bootstrap), /keep-ask, /keep-compile (--dry to preview), /keep-check-drift (deterministic, CI-friendly), /keep-idea, /keep-govern.",
   "repository": "https://github.com/CuriousDolphin/KEEP"
 }
