@@ -28,6 +28,18 @@ For "$ARGUMENTS":
 
 Same selection logic, no synthesis.
 
+## Decision-grade cross-check
+
+When the user is using the answer for an *immediate decision* (merge, deploy, debug-in-progress, "is this still true?") and a load-bearing claim is anchorable, verify it against the code **after** citing `/knowledge/`. A spec is a snapshot; code is *now*. They can drift between two merges, and a user about to act deserves the warning.
+
+Concretely: if the answer rests on a value the spec declares in its `anchors:` block (a `const`, a function signature, a test name), either run `scripts/check_drift.py --spec <id>` or grep for the literal in the cited source file. If spec and code diverge, surface the drift — don't bury it for `/keep-check-drift` to catch at merge time.
+
+**Decision-grade cues:** *"sto per mergeare…"*, *"is it safe to deploy"*, *"sto debuggando — cosa dice la spec?"*, *"è ancora vero che…?"*, *"this still the case?"*.
+
+**Not decision-grade:** *"how does X work?"* (informational), *"why did we choose Y?"* (historical), *"what's our convention for Z?"* (descriptive). For these, stay within `/knowledge/` — the spec text is the answer.
+
+This is additive to the read-path discipline, not a replacement. `/knowledge/` remains the primary source; the cross-check is a guardrail for the moments where being out-of-date matters most.
+
 ## Hard rules
 
 - Read-only. No file writes.

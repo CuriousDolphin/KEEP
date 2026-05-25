@@ -19,6 +19,8 @@ KEEP is failing if it triggers only on code changes. The read path — consultin
 
 The user is reaching for information that *should be* in `/knowledge`. Even if the answer is also in code, the knowledge layer has the **why** (rationale, rejected alternatives, edge cases) that code does not. Antipattern: answering from memory or grep.
 
+**Decision-grade cross-check.** When the user is about to act on the answer (merge, deploy, debug-in-progress), `/keep-ask` consults `/knowledge` first *then* verifies anchored load-bearing claims against code — a spec can drift between merges, and the user deserves the warning before they act. Cues: *"sto per mergeare"*, *"is this still true"*, *"safe to deploy?"*. See `commands/keep-ask.md`.
+
 **Write** — run `/keep-compile` after non-trivial code changes in a `/knowledge`-enabled repo: new features, dependency/framework swaps, topology changes, post-incident fixes, runtime-affecting config changes.
 
 **Drift** — run `/keep-check-drift` before merging, before declaring a task complete, or when the diff touches code referenced by any spec.
