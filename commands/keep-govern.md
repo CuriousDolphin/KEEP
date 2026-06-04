@@ -3,29 +3,10 @@ description: Periodic hygiene check — detect entropy in /knowledge over time (
 argument-hint: (no args)
 ---
 
-Run periodically (weekly at most), not every cycle. Govern is hygiene *over time* on the whole knowledge base; `/keep-check-drift` is correctness *now* on a specific diff. A file can pass drift (matches current code) but fail govern (stale, oversized, duplicated). Both are detectors — neither modifies files.
+Input: `$ARGUMENTS`
 
-## What to scan
+This is a thin entry point for `/keep-govern`. The full, canonical contract lives inside the skill so it travels with both the plugin and skill-only installs:
 
-Walk `/knowledge/docs/` and `/knowledge/ideas/`. Look for:
+**`skills/KEEP/references/commands/keep-govern.md`**
 
-- Files with `status: accepted` not touched in >6 months where the corresponding code area has changed (use `related:` patterns to map).
-- Pairs of files whose `description` or content overlap heavily — duplication candidates.
-- ADRs that contradict each other without an explicit `supersedes`/`refines` link.
-- Files >~300 lines that should be split.
-- Files containing `<!-- TODO(KEEP): ... -->` markers — incomplete knowledge to enrich now that context may be fresher.
-- Ideas in `status: draft` older than 30 days — either promote or mark `deprecated`.
-- Specs without `related:` entries pointing to code/tests — the link is what makes drift detection possible.
-- INDEX.md regeneration sanity: run `scripts/build_index.py --dry-run` and compare to the on-disk INDEX. If they differ, INDEX was hand-edited and needs regeneration.
-- Stray directories outside the canonical layout (`/knowledge/tasks/`, `/knowledge/architecture/`, `/knowledge/runbooks/`). Canonical layout is `docs/{specs,decisions}/` + `ideas/`; runbooks/architecture live as specs with reserved tags.
-
-## Output
-
-Group suggestions by action — *archive*, *merge*, *summarize*, *split*, *enrich*, *collapse*, *promote*, *deprecate* — one-line rationale each. Wait for explicit per-suggestion approval before applying anything.
-
-## Hard rules
-
-- Suggestions only. Never auto-delete, auto-merge, or auto-rewrite.
-- Preserve historical rationale. To remove a file, move it to `/knowledge/docs/_archive/` — never delete outright.
-- Be conservative on staleness: a doc untouched isn't stale if the code is also untouched.
-- Govern never blocks anything. For enforcement on a specific diff, use `/keep-check-drift`.
+Read that file and follow it exactly against the current repository. It is the single source of truth for this command — make any behavior change there, never here.
